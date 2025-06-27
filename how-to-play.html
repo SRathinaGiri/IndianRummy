@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>How to Play Rummy</title>
+    <link rel="stylesheet" href="style.css">
+    <style>
+        body { justify-content: center; text-align: left; }
+        .container { max-width: 800px; background-color: #005000; padding: 20px; border-radius: 10px; border: 2px solid #C8A531;}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>How to Play Classic Rummy</h1>
+        
+        <h2>The Objective</h2>
+        <p>The main goal is to be the first player to arrange all 13 of your cards into valid groups, which are either "sequences" or "sets".</p>
+
+        <h2>Valid Groups</h2>
+        <h4>1. Sequences (or Runs)</h4>
+        <p>A sequence consists of three or more cards of the <strong>same suit</strong> in consecutive order.</p>
+        <ul>
+            <li><strong>Pure Sequence:</strong> A sequence made without a Joker. (e.g., <strong>5♥ 6♥ 7♥</strong>).<br>
+                A special case, a "Golden Rummy" or "Trial", which is three cards of the exact same rank and suit (e.g., <strong>7♦ 7♦ 7♦</strong> from three decks), is also considered a valid pure sequence.</li>
+            <li><strong>Impure Sequence:</strong> A sequence where one or more cards have been replaced by a printed Joker or a Wild Joker. (e.g., <strong>A♠ JOKER K♠</strong>)</li>
+        </ul>
+
+        <h4>2. Sets (or Trios/Quads)</h4>
+        <p>A set consists of three or four cards of the <strong>same rank</strong> but with <strong>different suits</strong>. You cannot use two cards of the same suit in a set.</p>
+        <ul>
+            <li>e.g., <strong>7♠ 7♥ 7♦</strong> is a valid set.</li>
+            <li>e.g., <strong>K♠ K♠ K♦</strong> is NOT a valid set.</li>
+        </ul>
+        
+        <h2>The Joker</h2>
+        <ul>
+            <li><strong>Printed Joker:</strong> The cards with "JOKER" written on them.</li>
+            <li><strong>Wild Joker:</strong> At the start of each round, one card is randomly chosen to be the "Wild Joker". All cards of that same rank, regardless of suit, can also be used as jokers for that round.</li>
+        </ul>
+
+        <h2>Winning the Game (Declaring)</h2>
+        <p>To declare a win, you must satisfy the following conditions:</p>
+        <ol>
+            <li>Arrange all 13 cards in your hand into valid groups.</li>
+            <li>Your hand must contain at least <strong>TWO sequences</strong>.</li>
+            <li>At least one of those sequences must be a <strong>PURE sequence</strong>.</li>
+        </ol>
+        <p>Once your cards are arranged, you discard your 14th card to declare your win.</p>
+        
+        <br>
+        <a href="index.html" style="color: #FFD700;">Back to Game</a>
+    </div>
+</body>
+</html>

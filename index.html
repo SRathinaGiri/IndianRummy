@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Indian Rummy Game</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#005000"/>    
+</head>
+<body>
+    <h1>Indian Rummy Game</h1>
+
+    <div id="settings-screen">
+        <img src="icon-512x512.png" alt="Rummy Game Icon" style="width: 50%; max-width: 256px; margin-bottom: 20px;">
+        <h2>Game Settings</h2>
+        <div class="setting-item">
+            <label for="num-players">Opponents:</label>
+            <select id="num-players">
+                <option value="1" selected>1</option>
+                <option value="2">2</option>
+                <option value="3">3</option>
+            </select>
+        </div>
+        <div class="setting-item">
+            <label for="num-rounds">Rounds:</label>
+            <select id="num-rounds">
+                <option value="1">1</option>
+                <option value="3" selected>3</option>
+                <option value="5">5</option>
+            </select>
+        </div>
+        <div class="setting-item">
+            <label for="hidden-joker">Hidden Joker Rule:</label>
+            <input type="checkbox" id="hidden-joker" checked>
+        </div>
+        <div class="setting-item">
+            <label for="debug-mode">Learner Mode (Show AI Hands):</label>
+            <input type="checkbox" id="debug-mode">
+        </div>        
+        <a href="how-to-play.html" style="color: #FFD700; margin-top: 15px; display: inline-block;">How to Play</a>
+        <br>
+        <button id="start-game-btn">Start Game</button>
+        <p style="margin-top: 20px; font-size: 14px;">Developed by S. Rathinagiri, in collaboration with Google Gemini</p>
+    </div>
+
+
+    <div id="scoreboard-screen" style="display: none;">
+        <img src="icon-512x512.png" alt="Rummy Game Icon" style="width: 50%; max-width: 256px; margin-bottom: 20px;">
+        <h2 id="round-winner-text"></h2>
+        <h3>Scoreboard</h3>
+        <table id="score-table"></table>
+        <button id="next-round-btn">Next Round</button>
+    </div>
+    
+    <div id="showdown-screen" style="display: none;">
+        <img src="icon-512x512.png" alt="Rummy Game Icon" style="width: 50%; max-width: 256px; margin-bottom: 20px;">
+        <h2 id="showdown-title"></h2>
+        <div id="showdown-content"></div>
+        <button id="continue-to-scoreboard-btn">Continue</button>
+    </div>    
+
+    <div id="game-container" style="display: none;">
+        <canvas id="gameCanvas" width="1280" height="800"></canvas>
+        <div class="controls">
+            <button id="sortButton">Sort</button>
+            <button id="meldButton">Group</button>
+            <button id="revealJokerButton">Reveal Joker</button>
+            <button id="discardButton">Discard</button>
+            <button id="declareButton">Declare</button>
+        </div>
+    </div>
+    <div id="debug-area" style="display: none;">
+        <h3>AI Hand Debug</h3>
+        <div id="debug-content"></div>
+    </div>
+    <audio id="audio-shuffle" src="shuffle.mp3" preload="auto"></audio>
+    <audio id="audio-draw" src="draw.mp3" preload="auto"></audio>
+    <audio id="audio-discard" src="discard.mp3" preload="auto"></audio>
+    <audio id="audio-meld" src="meld.mp3" preload="auto"></audio>
+    <audio id="audio-declare" src="declare.mp3" preload="auto"></audio>
+    <audio id="audio-win" src="win.mp3" preload="auto"></audio>
+    <audio id="audio-error" src="error.mp3" preload="auto"></audio>
+    <audio id="audio-click" src="click.mp3" preload="auto"></audio>    
+    
+    <script type="module" src="main.js"></script>
+</body>
+</html>
