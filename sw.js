@@ -1,12 +1,17 @@
-const CACHE_NAME = 'rummy-game-cache-v1';
+const CACHE_NAME = 'rummy-game-cache-v2'; // Updated cache name
 const urlsToCache = [
   '/',
   'index.html',
   'style.css',
   'rummy-logic.js',
-  'main.js',
+  'config.js',
+  'ui.js',
+  'main-v2.js',      // Renamed file
+  'drawing-v2.js',   // Renamed file
   'cards.png',
   'joker.png',
+  'card-back.png',   // New card back image
+  'icon-512x512.png',
   'shuffle.mp3',
   'draw.mp3',
   'discard.mp3',
