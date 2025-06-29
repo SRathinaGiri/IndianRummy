@@ -1,6 +1,6 @@
 // config.js - Game Configuration and Constants
-export const SCREEN_WIDTH = 1200;
-export const SCREEN_HEIGHT = 380;   // Reduced height to make space for Learner Mode
+export const SCREEN_WIDTH = 800;
+export const SCREEN_HEIGHT = 310;   // Reduced height to make space for Learner Mode
 export const CARD_WIDTH = 69;
 export const CARD_HEIGHT = 100;
 export const CARD_MARGIN = 8;

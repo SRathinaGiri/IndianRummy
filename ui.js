@@ -57,21 +57,51 @@ export function updateDebugView(App) {
     if (!App.game || !App.game.settings.debugMode) return;
     
     const debugContent = document.getElementById('debug-content');
-    debugContent.innerHTML = '';
+    debugContent.innerHTML = ''; 
+
+    if (App.game.wild_joker) {
+        const jokerHeader = document.createElement('h4');
+        jokerHeader.style.textAlign = 'center';
+        jokerHeader.style.margin = '0 0 10px 0';
+        jokerHeader.textContent = `Wild Joker for this Round: ${App.game.wild_joker.toString()}`;
+        debugContent.appendChild(jokerHeader);
+    }
+
     App.game.players.forEach((p, p_idx) => {
         if (p.isAi) {
             const playerDiv = document.createElement('div');
             playerDiv.className = 'debug-player';
-            
-            const handHtml = p.hand.map(card => {
+
+            const createCardText = (card) => {
+                if (!card) return '';
                 const colorClass = (card.suit === 'Hearts' || card.suit === 'Diamonds') ? 'card-text-red' : 'card-text-black';
                 return `<span class="${colorClass}" style="font-weight:bold;">${card.toString()}</span>`;
-            }).join(' ');
-
-            const evalResult = App.game._evaluateHandPotential(p.hand, p_idx);
-            const potentialScore = evalResult.score;
+            };
             
-            playerDiv.innerHTML = `<b>${p.name} (Potential Points: ${potentialScore}):</b> ${handHtml}`;
+            const analysis = App.game.getHandAnalysis(p);
+            const realPoints = analysis.realPoints;
+            
+            const rankMap = new Map(p.ranks_order.map((r, i) => [r, i]));
+            const suitMap = new Map(p.suits_order.map((s, i) => [s, i]));
+            analysis.deadwood.sort((a, b) => (suitMap.get(a.suit) - suitMap.get(b.suit)) || (rankMap.get(a.rank) - rankMap.get(b.rank)));
+
+            const meldsHtml = analysis.melds.map(meld => `[${meld.map(createCardText).join(' ')}]`).join(' ');
+            const deadwoodHtml = analysis.deadwood.map(createCardText).join(' ');
+            
+            const potentialScore = App.game._evaluateHandPotential([...p.hand, ...p.melds.flat()], p);
+            
+            let fullHandHtml = meldsHtml;
+            if (deadwoodHtml) {
+                fullHandHtml += (meldsHtml ? ' | ' : '') + deadwoodHtml;
+            }
+
+            // --- NEW: Display the Last Move ---
+            const drawnText = p.lastDrawnCard ? createCardText(p.lastDrawnCard) : '--';
+            const discardedText = p.lastDiscardedCard ? createCardText(p.lastDiscardedCard) : '--';
+            const moveHtml = `<span style="font-size: 12px; color: #333;">(Drawn: ${drawnText} | Discarded: ${discardedText})</span>`;
+            
+            const jokerSeenStatus = p.hasSeenJoker ? 'Yes' : 'No';
+            playerDiv.innerHTML = `<b>${p.name} :</b> ${fullHandHtml} <br> ${moveHtml}(Joker Seen: ${jokerSeenStatus}) (Real Points: ${realPoints} | AI Score: ${potentialScore})`;
             debugContent.appendChild(playerDiv);
         }
     });

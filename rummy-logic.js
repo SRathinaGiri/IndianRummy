@@ -1,4 +1,5 @@
-// rummy-logic.js
+// rummy-logic.js - PART 1 of 7
+
 class Card {
     constructor(suit, rank) {
         this.suit = suit; this.rank = rank;
@@ -35,13 +36,15 @@ class Deck {
     }
     deal() { return this.cards.pop() || null; }
 }
-class Player {
+export class Player {
     constructor(name, isAi = false) {
         this.name = name; this.isAi = isAi; this.hand = []; this.melds = [];
         this.selectedIndices = []; this.hasSeenJoker = false;
         this.canRevealJoker = false;
         this.ranks_order = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'JOKER'];
         this.suits_order = ['Hearts', 'Diamonds', 'Clubs', 'Spades', 'Joker'];
+        this.lastDrawnCard = null;
+        this.lastDiscardedCard = null;        
     }
     addCards(cards) { this.hand.push(...cards); }
     sortHand() {
@@ -50,12 +53,14 @@ class Player {
         const suitMap = new Map(this.suits_order.map((s, i) => [s, i]));
         this.hand.sort((a, b) => (suitMap.get(a.suit) - suitMap.get(b.suit)) || (rankMap.get(a.rank) - rankMap.get(b.rank)));
     }
-    resetForNewRound() { 
-        this.hand = []; 
-        this.melds = []; 
+    resetForNewRound() {
+        this.hand = [];
+        this.melds = [];
         this.selectedIndices = [];
         this.hasSeenJoker = false;
         this.canRevealJoker = false;
+        this.lastDrawnCard = null;
+        this.lastDiscardedCard = null;        
     }
     toggleSelection(cardIndex) {
         const i = this.selectedIndices.indexOf(cardIndex);
@@ -79,10 +84,13 @@ export class RummyGameLogic {
         this.pickup_log = {};
         this.setup_round();
     }
+    
+// rummy-logic.js - PART 2 of 7
+
     setup_round() {
         this.deck = new Deck(3);
-        this.players.forEach((p, i) => { 
-            p.resetForNewRound(); 
+        this.players.forEach((p, i) => {
+            p.resetForNewRound();
             if (!this.settings.hiddenJoker) p.hasSeenJoker = true;
             this.pickup_log[i] = [];
         });
@@ -99,83 +107,72 @@ export class RummyGameLogic {
         this.current_player_index = 0;
         this.penaltyPlayerIndex = null;
     }
-    calculateScores(winnerIndex, penaltyPlayerIndex = null) {
-        if (penaltyPlayerIndex !== null) {
-            this.scores[penaltyPlayerIndex] += 80;
-        } else {
-            this.players.forEach((player, index) => {
-                if (index !== winnerIndex) this.scores[index] += player.hand.reduce((total, card) => total + card.getPoints(), 0);
-            });
-        }
-    }
-    calculatePlayerPoints(playerIndex) {
-        const player = this.players[playerIndex];
-        if (this.penaltyPlayerIndex === playerIndex) return 80;
-        if (this.penaltyPlayerIndex !== null && this.penaltyPlayerIndex !== playerIndex) return 0;
-        if (this.turn_state === 'ROUND_OVER' && this.current_player_index === playerIndex && this.penaltyPlayerIndex === null) return 0;
-        return player.hand.reduce((total, card) => total + card.getPoints(), 0);
-    }
-    endRound(winnerIndex, penaltyPlayerIndex = null) {
-        this.turn_state = 'ROUND_OVER';
-        if (winnerIndex !== null) this.current_player_index = winnerIndex;
-        this.penaltyPlayerIndex = penaltyPlayerIndex;
-        this.calculateScores(winnerIndex, penaltyPlayerIndex);
-    }
-    startNextRound() {
-        this.currentRound++;
-        this.setup_round();
-    }
-    playerDrawFromStock() {
-        const player = this.players[this.current_player_index];
-        const card = this.stock_pile.pop();
-        if(card) player.addCards([card]);
-        this.turn_state = 'ACTION';
-    }
-    playerDrawFromDiscard() {
-        const player = this.players[this.current_player_index];
-        const card = this.discard_pile.pop();
-        if(card) {
-            player.addCards([card]);
-            if (!this.pickup_log[this.current_player_index]) this.pickup_log[this.current_player_index] = [];
-            this.pickup_log[this.current_player_index].push(card);
-        }
-        this.turn_state = 'ACTION';
-    }
-    playerDiscardCard(card) {
-        if (!card) return;
-        this.discard_pile.push(card);
-        this.discard_history.push(card);
-    }
-    groupSelectedCards() {
-        const player = this.players[this.current_player_index];
-        if (player.isAi || player.selectedIndices.length === 0) return;
-        const cardsToMeld = [];
-        const newHand = player.hand.filter((card, index) => {
-            if (player.selectedIndices.includes(index)) {
-                cardsToMeld.push(card);
-                return false;
-            }
-            return true;
-        });
-        if (cardsToMeld.length > 0) {
-            player.hand = newHand;
-            player.melds.push(cardsToMeld);
-            player.selectedIndices = [];
-        }
-    }
-    ungroupMeld(meldIndex) {
-        const player = this.players[this.current_player_index];
-        if (player.isAi || !player.melds[meldIndex]) return;
-        const cardsToReturn = player.melds.splice(meldIndex, 1)[0];
-        player.hand.push(...cardsToReturn);
-        player.sortHand();
-    }
-    isJoker(card, playerIndex) {
-        const player = this.players[playerIndex];
-        if (!card) return false;
+
+    // --- REFACTORED HELPER FUNCTIONS (They now accept a player object directly) ---
+    isJoker(card, player) {
+        if (!card || !player) return false;
         return card.rank === 'JOKER' || (player.hasSeenJoker && this.wild_joker && card.rank === this.wild_joker.rank);
     }
-    _getAllPossibleMelds(hand, playerIndex) {
+
+   isPureSequence(meld, player) {
+        // To be a pure sequence, a meld must first be a valid run.
+        if (!this._validateRun(meld, player)) {
+            return false;
+        }
+        // And it must contain NO jokers (neither printed nor wild).
+        const hasJoker = meld.some(card => this.isJoker(card, player));
+        return !hasJoker;
+    }
+
+    _validateRun(cards, player) {
+        if (cards.length < 3) return false;
+        
+        // --- THIS IS THE FIX ---
+        // First, check for a Golden Rummy (e.g., 9♣ 9♣ 9♣)
+        const firstCard = cards[0];
+        if (cards.every(card => card.rank === firstCard.rank && card.suit === firstCard.suit)) {
+            return true;
+        }
+        // --- END OF FIX ---
+
+        const jokers = cards.filter(c => this.isJoker(c, player));
+        const nonJokers = cards.filter(c => !this.isJoker(c, player));
+        if (nonJokers.length === 0) return true;
+        
+        const nonJokerRanks = nonJokers.map(c => c.rank);
+        if (new Set(nonJokerRanks).size !== nonJokerRanks.length) return false;
+        
+        const suit = nonJokers[0].suit;
+        if (nonJokers.some(c => c.suit !== suit)) return false;
+        
+        const sortedNonJokers = [...nonJokers].sort((a, b) => this.rankMap.get(a.rank) - this.rankMap.get(b.rank));
+        const gaps1 = this._calculateGaps(sortedNonJokers, this.rankMap);
+        if (gaps1 <= jokers.length) return true;
+
+        if (sortedNonJokers.some(c => c.rank === 'A')) {
+            const akqRankMap = new Map(this.rankMap);
+            akqRankMap.set('A', 13);
+            const akqSorted = [...nonJokers].sort((a, b) => (akqRankMap.get(a.rank) ?? -1) - (akqRankMap.get(b.rank) ?? -1));
+            const gaps2 = this._calculateGaps(akqSorted, akqRankMap);
+            if (gaps2 <= jokers.length) return true;
+        }
+        return false;
+    }
+
+// rummy-logic.js - PART 3 of 7
+
+    _validateSet(cards, player) {
+        if (cards.length < 3) return false;
+        const nonJokers = cards.filter(c => !this.isJoker(c, player));
+        if (nonJokers.length === 0) return true;
+        if (cards.length > 4) return false;
+        const rank = nonJokers[0].rank;
+        if (nonJokers.some(c => c.rank !== rank)) return false;
+        const suits = nonJokers.map(c => c.suit);
+        return new Set(suits).size === suits.length;
+    }
+
+    _getAllPossibleMelds(hand, player) {
         const runs = [];
         const sets = [];
         const combinations = (arr, k) => {
@@ -190,142 +187,14 @@ export class RummyGameLogic {
             });
             return combs;
         };
-        const allCombs = [...combinations(hand, 3), ...combinations(hand, 4), ...combinations(hand, 5)];
+        const allCombs = [...combinations(hand, 3), ...combinations(hand, 4), ...combinations(hand, 5), ...combinations(hand, 6)];
         for (const meld of allCombs) {
-            if (this._validateRun(meld, playerIndex)) runs.push(meld);
-            else if (this._validateSet(meld, playerIndex)) sets.push(meld);
+            if (this._validateRun(meld, player)) runs.push(meld);
+            else if (this._validateSet(meld, player)) sets.push(meld);
         }
         return { runs, sets };
     }
-    _evaluateHandPotential(hand, playerIndex) {
-        let bestEval = { melds: [], score: hand.reduce((s, c) => s + c.getPoints(), 0) };
-        const { runs } = this._getAllPossibleMelds(hand, playerIndex);
-        const pureRuns = runs.filter(r => this.isPureSequence(r, playerIndex));
-        if (pureRuns.length === 0) return bestEval;
-        for (const pureRun of pureRuns) {
-            let handAfterPureRun = hand.filter(c => !pureRun.includes(c));
-            const secondRuns = this._getAllPossibleMelds(handAfterPureRun, playerIndex).runs;
-            if (secondRuns.length === 0) continue;
-            for (const secondRun of secondRuns) {
-                let currentMelds = [pureRun, secondRun];
-                let remainingCards = hand.filter(c => !new Set([...pureRun, ...secondRun]).has(c));
-                let madeMoreMelds = true;
-                while (madeMoreMelds) {
-                    madeMoreMelds = false;
-                    const { runs: nextRuns, sets: nextSets } = this._getAllPossibleMelds(remainingCards, playerIndex);
-                    const bestNextMeld = [...nextRuns, ...nextSets].sort((a,b) => b.length - a.length)[0];
-                    if (bestNextMeld) {
-                        currentMelds.push(bestNextMeld);
-                        remainingCards = remainingCards.filter(c => !bestNextMeld.includes(c));
-                        madeMoreMelds = true;
-                    }
-                }
-                const score = remainingCards.reduce((s, c) => s + c.getPoints(), 0);
-                if (score < bestEval.score) {
-                    bestEval.score = score;
-                    bestEval.melds = currentMelds;
-                }
-            }
-        }
-        return bestEval;
-    }
-    executeAiTurn() {
-        const player = this.players[this.current_player_index];
-        const playerIndex = this.current_player_index;
-        if (this.settings.hiddenJoker && !player.hasSeenJoker) {
-            if (this._getAllPossibleMelds(player.hand, playerIndex).runs.some(run => this.isPureSequence(run, playerIndex))) {
-                player.hasSeenJoker = true;
-            }
-        }
-        let drawnCard = null;
-        const discardTop = this.discard_pile.length > 0 ? this.discard_pile[this.discard_pile.length - 1] : null;
-        const currentEval = this._evaluateHandPotential(player.hand, playerIndex);
-        
-        let pickFromDiscard = false;
-        if (discardTop && !this.isJoker(discardTop, playerIndex)) {
-            const potentialHand = [...player.hand, discardTop];
-            const evalWithDiscard = this._evaluateHandPotential(potentialHand, playerIndex);
-            if (evalWithDiscard.score < currentEval.score - 5) pickFromDiscard = true;
-        }
-        if (pickFromDiscard) {
-            drawnCard = this.discard_pile.pop();
-            this.pickup_log[playerIndex].push(drawnCard);
-        } else {
-            if (this.stock_pile.length === 0) return { drawn: null, discarded: null };
-            drawnCard = this.stock_pile.pop();
-        }
-        if (drawnCard) player.addCards([drawnCard]);
-        else return { drawn: null, discarded: null };
 
-        for (const potentialDiscard of player.hand) {
-            const tempHand = player.hand.filter(c => c !== potentialDiscard);
-            if(tempHand.length === 13) {
-                const finalEval = this._evaluateHandPotential(tempHand, playerIndex);
-                if (finalEval.score === 0) {
-                     player.melds = finalEval.melds;
-                     player.hand = tempHand.filter(c => !player.melds.flat().includes(c));
-                     this.endRound(playerIndex, null);
-                     return { drawn: drawnCard, discarded: potentialDiscard, declared: true };
-                }
-            }
-        }
-        let bestCardToDiscard = null;
-        let bestScore = Infinity;
-        const nextPlayerIndex = (playerIndex + 1) % this.players.length;
-        const nextPlayerPickups = this.pickup_log[nextPlayerIndex] || [];
-        for (const potentialDiscard of player.hand) {
-            if (this.isJoker(potentialDiscard, playerIndex) && player.hand.some(c => !this.isJoker(c, playerIndex))) continue;
-            const tempHand = player.hand.filter(c => c !== potentialDiscard);
-            const futureEval = this._evaluateHandPotential(tempHand, playerIndex);
-            let score = futureEval.score + potentialDiscard.getPoints();
-            for (const pickedCard of nextPlayerPickups) {
-                if(pickedCard.suit === potentialDiscard.suit) {
-                    if(Math.abs(this.rankMap.get(pickedCard.rank) - this.rankMap.get(potentialDiscard.rank)) < 3) score += 20;
-                }
-            }
-            if (score < bestScore) {
-                bestScore = score;
-                bestCardToDiscard = potentialDiscard;
-            }
-        }
-        if (!bestCardToDiscard) bestCardToDiscard = player.hand[player.hand.length - 1];
-        const discardIndex = player.hand.findIndex(c => c === bestCardToDiscard);
-        const discardedCard = player.hand.splice(discardIndex, 1)[0];
-        return { drawn: drawnCard, discarded: discardedCard };
-    }
-    autoMeld(player) {
-        const playerIndex = this.players.findIndex(p => p === player);
-        const evalResult = this._evaluateHandPotential(player.hand, playerIndex);
-        if (evalResult.melds.length > 0) {
-            player.melds = evalResult.melds;
-            player.hand = player.hand.filter(c => !evalResult.melds.flat().includes(c));
-        }
-    }
-    nextTurn() {
-        if (this.turn_state === 'ROUND_OVER') return;
-        this.players[this.current_player_index].selectedIndices = [];
-        this.current_player_index = (this.current_player_index + 1) % this.players.length;
-        this.turn_state = 'DRAW';
-    }
-    isPureSequence(meld, playerIndex) {
-        if (meld.length < 3) return false;
-        if (meld.some(card => this.isJoker(card, playerIndex) && card.rank === 'JOKER')) return false;
-        const firstCard = meld[0];
-        if (meld.every(card => card.rank === firstCard.rank && card.suit === firstCard.suit)) return true;
-        const suit = meld[0].suit;
-        if (meld.some(card => card.suit !== suit)) return false;
-        const ranks = meld.map(c => c.rank);
-        if (new Set(ranks).size !== ranks.length) return false;
-        const sortedMeld = [...meld].sort((a, b) => this.rankMap.get(a.rank) - this.rankMap.get(b.rank));
-        if (this._calculateGaps(sortedMeld, this.rankMap) === 0) return true;
-        if (sortedMeld.some(c => c.rank === 'A')) {
-            const akqRankMap = new Map(this.rankMap);
-            akqRankMap.set('A', 13);
-            const akqSortedMeld = [...meld].sort((a, b) => (akqRankMap.get(a.rank) ?? -1) - (akqRankMap.get(b.rank) ?? -1));
-            if (this._calculateGaps(akqSortedMeld, akqRankMap) === 0) return true;
-        }
-        return false;
-    }
     _calculateGaps(nonJokers, rankMap) {
         let gaps = 0;
         for (let i = 0; i < nonJokers.length - 1; i++) {
@@ -336,57 +205,339 @@ export class RummyGameLogic {
         }
         return gaps;
     }
-    _validateRun(cards, playerIndex) {
-        if (cards.length < 3) return false;
-        const jokers = cards.filter(c => this.isJoker(c, playerIndex));
-        const nonJokers = cards.filter(c => !this.isJoker(c, playerIndex));
-        if (nonJokers.length === 0) return true;
-        const nonJokerRanks = nonJokers.map(c => c.rank);
-        if (new Set(nonJokerRanks).size !== nonJokerRanks.length) return false;
-        const suit = nonJokers[0].suit;
-        if (nonJokers.some(c => c.suit !== suit)) return false;
-        const sortedNonJokers = [...nonJokers].sort((a, b) => this.rankMap.get(a.rank) - this.rankMap.get(b.rank));
-        const gaps1 = this._calculateGaps(sortedNonJokers, this.rankMap);
-        if (gaps1 <= jokers.length) return true;
-        if (sortedNonJokers.some(c => c.rank === 'A')) {
-            const akqRankMap = new Map(this.rankMap);
-            akqRankMap.set('A', 13);
-            const akqSorted = [...nonJokers].sort((a, b) => (akqRankMap.get(a.rank) ?? -1) - (akqRankMap.get(b.rank) ?? -1));
-            const gaps2 = this._calculateGaps(akqSorted, akqRankMap);
-            if (gaps2 <= jokers.length) return true;
+    // --- END OF HELPER REFACTOR ---
+
+
+    // --- AI STRATEGY FUNCTIONS ---
+    // The new autoMeld function, as designed by you.
+   autoMeld(player) {
+        const hand = [...player.hand, ...player.melds.flat()];
+        player.melds = []; // Start fresh
+        let remainingCards = [...hand];
+        let finalMelds = [];
+
+        const without = (source, items) => {
+            const itemSet = new Set(items.map(c => c.toString()));
+            return source.filter(c => !itemSet.has(c.toString()));
+        };
+        const meldPoints = (meld) => meld.reduce((s, c) => s + c.getPoints(), 0);
+
+        // --- A simpler, more robust greedy algorithm ---
+
+        // Phase 1: Greedily find all possible PURE sequences.
+        let changed = true;
+        while(changed) {
+            changed = false;
+            const pureRuns = this._getAllPossibleMelds(remainingCards, player).runs.filter(r => this.isPureSequence(r, player));
+            if (pureRuns.length > 0) {
+                // Prioritize the pure run that saves the most points
+                pureRuns.sort((a,b) => meldPoints(b) - meldPoints(a)); 
+                const bestPureRun = pureRuns[0];
+                finalMelds.push(bestPureRun);
+                remainingCards = without(remainingCards, bestPureRun);
+                changed = true;
+            }
         }
-        return false;
+        
+        // Phase 2: Greedily find all possible IMPURE sequences.
+        changed = true;
+        while(changed) {
+            changed = false;
+            const impureRuns = this._getAllPossibleMelds(remainingCards, player).runs;
+            if(impureRuns.length > 0) {
+                impureRuns.sort((a,b) => meldPoints(b) - meldPoints(a));
+                const bestImpureRun = impureRuns[0];
+                finalMelds.push(bestImpureRun);
+                remainingCards = without(remainingCards, bestImpureRun);
+                changed = true;
+            }
+        }
+
+        // Phase 3: Check if rules are met. If so, form all possible sets.
+        const runCount = finalMelds.filter(m => this._validateRun(m, player)).length;
+        const pureRunCount = finalMelds.filter(m => this.isPureSequence(m, player)).length;
+
+        if (runCount >= 2 && pureRunCount >= 1) {
+            changed = true;
+            while(changed) {
+                changed = false;
+                const sets = this._getAllPossibleMelds(remainingCards, player).sets;
+                if(sets.length > 0) {
+                    sets.sort((a,b) => meldPoints(b) - meldPoints(a));
+                    const bestSet = sets[0];
+                    finalMelds.push(bestSet);
+                    remainingCards = without(remainingCards, bestSet);
+                    changed = true;
+                }
+            }
+        }
+        
+        player.melds = finalMelds;
+        player.hand = remainingCards; // The remaining cards are the deadwood
     }
-    _validateSet(cards, playerIndex) {
-        if (cards.length < 3) return false;
-        const nonJokers = cards.filter(c => !this.isJoker(c, playerIndex));
-        if (nonJokers.length === 0) return true;
-        if (cards.length > 4) return false;
-        const rank = nonJokers[0].rank;
-        if (nonJokers.some(c => c.rank !== rank)) return false;
-        const suits = nonJokers.map(c => c.suit);
-        return new Set(suits).size === suits.length;
+
+// rummy-logic.js - PART 4 of 7
+    
+    _evaluateHandPotential(hand, player) {
+        const tempPlayer = new Player('dummy', true);
+        tempPlayer.hand = [...hand];
+        tempPlayer.hasSeenJoker = player.hasSeenJoker;
+        this.autoMeld(tempPlayer);
+        let score = tempPlayer.hand.reduce((s, c) => s + c.getPoints(), 0);
+        if (tempPlayer.melds.length > 0) {
+             const validation = this.validateDeclaration(tempPlayer);
+             if (validation.isValid) {
+                 score -= 100; 
+             } else {
+                 score -= tempPlayer.melds.length * 10;
+             }
+        }
+        return score;
     }
-    validateDeclaration(playerIndex) {
-        const player = this.players[playerIndex];
+    
+    executeAiTurn() {
+        const player = this.players[this.current_player_index];
+
+        if (this.settings.hiddenJoker && player.canRevealJoker && !player.hasSeenJoker) {
+            player.hasSeenJoker = true;
+        }
+
+        const discardTop = this.discard_pile[this.discard_pile.length - 1];
+        let pickFromDiscard = false;
+        if (discardTop) {
+            if (this.isJoker(discardTop, player)) {
+                pickFromDiscard = true;
+            } else {
+                const currentScore = this._evaluateHandPotential([...player.hand, ...player.melds.flat()], player);
+                const scoreWithCard = this._evaluateHandPotential([...player.hand, ...player.melds.flat(), discardTop], player);
+                if (scoreWithCard < currentScore) {
+                    pickFromDiscard = true;
+                }
+            }
+        }
+        let drawnCard = null;
+        if (pickFromDiscard) {
+            drawnCard = this.discard_pile.pop();
+        } else {
+            if (this.stock_pile.length === 0) return { drawn: null, discarded: null, declared: false };
+            drawnCard = this.deck.deal();
+        }
+        player.lastDrawnCard = drawnCard;
+        
+        const entireHand = [...player.hand, ...player.melds.flat()];
+        if(drawnCard) entireHand.push(drawnCard);
+        
+        player.hand = entireHand;
+        player.melds = [];
+        this.autoMeld(player);
+
+        if (player.hand.length <= 1) {
+            const validation = this.validateDeclaration(player);
+            if(validation.isValid) {
+                let cardToDiscard;
+                if(player.hand.length === 1) {
+                    cardToDiscard = player.hand[0];
+                } else if(player.melds.length > 0) {
+                    const lastMeld = player.melds[player.melds.length - 1];
+                    if (lastMeld && lastMeld.length > 0) cardToDiscard = lastMeld.pop();
+                }
+                if (cardToDiscard) {
+                    player.hand = [];
+                    player.lastDiscardedCard = cardToDiscard;
+                    return { drawn: drawnCard, discarded: cardToDiscard, declared: true };
+                }
+            }
+        }
+
+        let bestCardToDiscard = null;
+        let discardPool = player.hand;
+        if (discardPool.length === 0) {
+             if (player.melds.length > 0) {
+                player.melds.sort((a,b) => a.reduce((s,c)=>s+c.getPoints(),0) - b.reduce((s,c)=>s+c.getPoints(),0));
+                const meldToBreak = player.melds.shift();
+                discardPool = meldToBreak;
+             } else {
+                 player.lastDiscardedCard = drawnCard;
+                 return { drawn: drawnCard, discarded: drawnCard, declared: false };
+             }
+        }
+        
+        let lowestFutureScore = Infinity;
+        for (const potentialDiscard of discardPool) {
+            if (this.isJoker(potentialDiscard, player) && discardPool.length > 1) continue;
+            const tempHand = discardPool.filter(c => c !== potentialDiscard);
+            const futureEval = this._evaluateHandPotential(tempHand, player);
+            if (futureEval < lowestFutureScore) {
+                lowestFutureScore = futureEval;
+                bestCardToDiscard = potentialDiscard;
+            }
+        }
+        
+        if (!bestCardToDiscard) {
+             bestCardToDiscard = discardPool.sort((a,b)=>b.getPoints()-a.getPoints())[0];
+        }
+        
+        const finalDiscardPool = player.hand.length > 0 ? player.hand : discardPool;
+        const discardIndex = finalDiscardPool.indexOf(bestCardToDiscard);
+        if (discardIndex > -1) {
+            finalDiscardPool.splice(discardIndex, 1);
+        }
+        
+        player.lastDiscardedCard = bestCardToDiscard;
+        return { drawn: drawnCard, discarded: bestCardToDiscard, declared: false };
+    }
+
+// rummy-logic.js - PART 5 of 7
+    
+    // --- CORE GAME AND SCORING FUNCTIONS ---
+    calculateScores(winnerIndex, penaltyPlayerIndex = null) {
+        if (penaltyPlayerIndex !== null) {
+            this.scores[penaltyPlayerIndex] += 80;
+        } else {
+            this.players.forEach((player, index) => {
+                if (index !== winnerIndex) {
+                    this.scores[index] += this.calculatePlayerPoints(player);
+                }
+            });
+        }
+    }
+    
+    calculatePlayerPoints(player) {
+        const playerObj = typeof player === 'number' ? this.players[player] : player;
+        if (!playerObj) return 0;
+
+        const playerIndex = this.players.indexOf(playerObj);
+        if (this.penaltyPlayerIndex === playerIndex) return 80;
+        if (this.penaltyPlayerIndex !== null && playerIndex !== -1 && playerIndex !== this.penaltyPlayerIndex) return 0;
+        if (this.turn_state === 'ROUND_OVER' && this.current_player_index === playerIndex && this.penaltyPlayerIndex === null) return 0;
+        
+        let totalPoints = 0;
+        playerObj.hand.forEach(card => {
+            if (!this.isJoker(card, playerObj)) {
+                totalPoints += card.getPoints();
+            }
+        });
+        return totalPoints;
+    }
+
+// rummy-logic.js - PART 6 of 7
+
+    getHandAnalysis(player) {
+        const tempPlayer = new Player(player.name, player.isAi);
+        tempPlayer.hand = [...player.hand];
+        tempPlayer.melds = [...player.melds];
+        tempPlayer.hasSeenJoker = player.hasSeenJoker;
+
+        this.autoMeld(tempPlayer);
+        
+        const deadwood = tempPlayer.hand;
+        const realPoints = deadwood.reduce((total, card) => total + (this.isJoker(card, tempPlayer) ? 0 : card.getPoints()), 0);
+
+        return { 
+            realPoints: realPoints,
+            melds: tempPlayer.melds,
+            deadwood: deadwood 
+        };
+    }
+
+    validateDeclaration(player) {
+        if (player.name !== 'dummy') {
+            const playerIndex = this.players.indexOf(player);
+             if (this.penaltyPlayerIndex === playerIndex) return { isValid: false, message: "Wrong Declaration"};
+        }
+       
         const allMeldedCards = player.melds.flat();
-        if (allMeldedCards.length !== 13) {
+        if (allMeldedCards.length > 0 && allMeldedCards.length !== 13) {
              return { isValid: false, message: `Declaration must use 13 cards. You have ${allMeldedCards.length}.` };
         }
-        let runCount = 0;
-        let pureRunCount = 0;
+        let runCount = 0, pureRunCount = 0;
         for (const meld of player.melds) {
             if (meld.length === 0) continue; 
-            const isRun = this._validateRun(meld, playerIndex);
-            const isSet = this._validateSet(meld, playerIndex);
+            const isRun = this._validateRun(meld, player);
+            const isSet = this._validateSet(meld, player);
             if (!isRun && !isSet) return { isValid: false, message: `Invalid group: [${meld.map(c=>c.toString()).join(', ')}]`};
             if (isRun) {
                 runCount++;
-                if (this.isPureSequence(meld, playerIndex)) pureRunCount++;
+                if (this.isPureSequence(meld, player)) pureRunCount++;
             }
         }
         if (runCount < 2) return { isValid: false, message: "You need at least two runs." };
         if (pureRunCount < 1) return { isValid: false, message: "You need at least one pure sequence." };
         return { isValid: true, message: "Valid declaration!" };
     }
-}
+    
+    endRound(winnerIndex, penaltyPlayerIndex = null) {
+        this.turn_state = 'ROUND_OVER';
+        if (winnerIndex !== null) this.current_player_index = winnerIndex;
+        this.penaltyPlayerIndex = penaltyPlayerIndex;
+        this.players.forEach((p, i) => {
+            if (i !== winnerIndex) this.autoMeld(p) 
+        });
+        this.calculateScores(winnerIndex, penaltyPlayerIndex);
+    }
+
+    startNextRound() { this.currentRound++; this.setup_round(); }
+
+    playerDrawFromStock() {
+        const player = this.players[this.current_player_index];
+        const card = this.deck.deal();
+        if(card) player.addCards([card]);
+        this.turn_state = 'ACTION';
+    }
+    playerDrawFromDiscard() {
+        const player = this.players[this.current_player_index];
+        const card = this.discard_pile.pop();
+        if(card) {
+            player.addCards([card]);
+            if (!this.pickup_log[this.current_player_index]) this.pickup_log[this.current_player_index] = [];
+            this.pickup_log[this.current_player_index].push(card);
+        }
+        this.turn_state = 'ACTION';
+    }
+
+// rummy-logic.js - PART 7 of 7
+
+    playerDiscardCard(card) { 
+        if(card) { 
+            this.discard_pile.push(card); 
+            this.discard_history.push(card); 
+        } 
+    }
+    groupSelectedCards() {
+        const player = this.players[this.current_player_index];
+        if(player.isAi || player.selectedIndices.length===0) return;
+        const cardsToMeld = [];
+        const newHand = player.hand.filter((card, index) => {
+            if (player.selectedIndices.includes(index)) {
+                cardsToMeld.push(card);
+                return false;
+            }
+            return true;
+        });
+        if(cardsToMeld.length > 0) {
+            player.hand = newHand;
+            player.melds.push(cardsToMeld);
+            player.selectedIndices = [];
+        }
+    }
+    ungroupMeld(meldIndex) {
+        const player = this.players[this.current_player_index];
+        if(player.isAi || !player.melds[meldIndex]) return;
+        player.hand.push(...player.melds.splice(meldIndex, 1)[0]);
+        player.sortHand();
+    }
+    nextTurn() {
+        if (this.turn_state === 'ROUND_OVER') return;
+        const previousPlayer = this.players[this.current_player_index];
+        if (this.settings.hiddenJoker && !previousPlayer.canRevealJoker) {
+            const allCards = [...previousPlayer.hand, ...previousPlayer.melds.flat()];
+            const { runs } = this._getAllPossibleMelds(allCards, previousPlayer);
+            if (runs.some(run => this.isPureSequence(run, previousPlayer))) {
+               previousPlayer.canRevealJoker = true;
+            }
+        }
+        previousPlayer.selectedIndices = [];
+        this.current_player_index = (this.current_player_index + 1) % this.players.length;
+        this.turn_state = 'DRAW';
+    }
+}    

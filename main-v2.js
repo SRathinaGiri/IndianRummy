@@ -1,7 +1,7 @@
 import * as C from './config.js';
 import * as Drawing from './drawing-v2.js';
 import * as UI from './ui.js';
-import { RummyGameLogic } from './rummy-logic.js';
+import { RummyGameLogic, Player } from './rummy-logic.js';
 
 document.addEventListener('DOMContentLoaded', () => {
     const App = {
@@ -131,11 +131,11 @@ document.addEventListener('DOMContentLoaded', () => {
         async animateInitialDeal() {
             this.isAnimating = true;
             this.setMessage('Dealing cards...');
-            const stockPilePos = { x: C.SCREEN_WIDTH / 2 - C.CARD_WIDTH - 15, y: 40 };
+            const stockPilePos = { x: 250, y: 40 }; // New coordinate
             const dealtCards = Array.from({ length: this.game.players.length }, () => []);
             for (let i = 0; i < 13; i++) {
                 for (let p_idx = 0; p_idx < this.game.players.length; p_idx++) {
-                    const card = this.game.stock_pile.pop();
+                    const card = this.game.deck.deal();
                     if (card) dealtCards[p_idx].push(card);
                 }
             }
@@ -153,16 +153,16 @@ document.addEventListener('DOMContentLoaded', () => {
                             let endPos;
                             let showBack = true;
                             if (p_idx === 0) {
-                                const handAndMeldY = 230;
+                                const handAndMeldY = 200;
                                 const finalHandWidth = 13 * C.CARD_OVERLAP + (C.CARD_WIDTH - C.CARD_OVERLAP);
                                 const handStartX = (C.SCREEN_WIDTH - finalHandWidth) / 2;
                                 endPos = { x: handStartX + i * C.CARD_OVERLAP, y: handAndMeldY };
                                 showBack = false;
                             } else {
                                 const aiPlayerIndex = p_idx - 1;
-                                const startX = C.SCREEN_WIDTH - 200;
-                                const startY = 40 + (aiPlayerIndex * (C.CARD_HEIGHT * 0.8 + 35));
-                                endPos = { x: startX + (i * 10), y: startY };
+                                const startX = 480 + (aiPlayerIndex * (C.CARD_WIDTH * 0.7 + 50));
+                                const startY = 40;
+                                endPos = { x: startX, y: startY };
                             }
                             this.animateCard(card, stockPilePos, endPos, resolve, showBack, 0.12);
                         }, (i * this.game.players.length + p_idx) * 50);
@@ -189,32 +189,37 @@ document.addEventListener('DOMContentLoaded', () => {
                 this.setMessage(`${currentPlayer.name} is thinking...`);
                 await this.sleep(1200);
                 const turnResult = this.game.executeAiTurn();
+
                 if (turnResult.declared) {
                     this.playSound('declare');
                     this.setMessage(`${currentPlayer.name} has declared!`);
                     await this.sleep(2000); 
-                    this.game.players.forEach((p, i) => {
-                        if (i !== this.game.current_player_index) this.game.autoMeld(p);
-                    });
+                    this.game.endRound(this.game.current_player_index, null);
                     this.declarationResult = { isValid: true, winnerName: currentPlayer.name, penaltyPlayer: null };
                     this.displayShowdownScreen();
-                } else if (turnResult && turnResult.drawn) {
+                    return; 
+                }
+                
+                if (turnResult && turnResult.drawn) {
                     this.playSound('draw');
                     this.setMessage(`${currentPlayer.name} drew a card.`);
-                    const stockPileRect = { x: C.SCREEN_WIDTH / 2 - C.CARD_WIDTH - 15, y: 40 };
+                    
+                    const stockPilePos = { x: 250, y: 40 };
+                    const discardPilePos = { x: 350, y: 40 };
                     const aiPlayerIndex = this.game.current_player_index - 1;
-                    const endPos = {
-                        x: C.SCREEN_WIDTH - (C.CARD_WIDTH) - 80,
-                        y: 150 + (aiPlayerIndex * (C.CARD_HEIGHT + 40))
+                    const aiHandArea = {
+                        x: 480 + (aiPlayerIndex * (C.CARD_WIDTH * 0.7 + 50)),
+                        y: 40
                     };
-                    this.animateCard(turnResult.drawn, stockPileRect, endPos, async () => {
+                    const drawStartPos = turnResult.drawn === this.game.discard_pile[this.game.discard_pile.length] ? discardPilePos : stockPilePos;
+
+                    this.animateCard(turnResult.drawn, drawStartPos, aiHandArea, async () => {
                          await this.sleep(1000);
                          if (turnResult.discarded) {
                             this.playSound('discard');
                             this.setMessage(`${currentPlayer.name} discarded ${turnResult.discarded.toString()}`);
-                            const discardPileRect = { x: C.SCREEN_WIDTH / 2 + 15, y: 40 };
                             this.isDiscarding = true;
-                            this.animateCard(turnResult.discarded, endPos, discardPileRect, () => {
+                            this.animateCard(turnResult.discarded, aiHandArea, discardPilePos, () => {
                                 this.game.playerDiscardCard(turnResult.discarded);
                                 this.game.nextTurn();
                                 this.isDiscarding = false;
@@ -234,11 +239,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
         handleSort() { this.playSound('click'); this.humanPlayer.sortHand(); },
 
+
         handleMeld() {
             if (this.Elements.meldButton.disabled || this.isAnimating) return;
             
             const player = this.humanPlayer;
-            const handAndMeldY = 230;
+            const handAndMeldY = 200;
 
             let meldsTotalWidth = 0;
             if (player.melds.length > 0) {
@@ -278,6 +284,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 animatedCount--;
                 if (animatedCount === 0) {
                     player.melds.push(cardsToMeld);
+                    
+                    // After melding, check if the HUMAN player has now earned the right to see the joker.
+                    if (this.game.settings.hiddenJoker && !player.canRevealJoker) {
+                        if (player.melds.some(meld => this.game.isPureSequence(meld, player))) {
+                            player.canRevealJoker = true;
+                        }
+                    }
                 }
             };
             
@@ -301,7 +314,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
             this.playSound('discard');
-            const handAndMeldY = 230;
+            const handAndMeldY = 200;
 
             let meldsTotalWidth = 0;
             if (player.melds.length > 0) {
@@ -334,13 +347,28 @@ document.addEventListener('DOMContentLoaded', () => {
             const player = this.game.players[this.game.current_player_index];
             const selectedCardIndex = player.selectedIndices[0];
             const finalDiscard = player.hand[selectedCardIndex];
+
+            // --- THIS IS THE FIX ---
+            // Create a temporary "dummy" player to safely test the declaration.
+            const dummyPlayer = new Player('dummy', false);
+            dummyPlayer.hasSeenJoker = player.hasSeenJoker;
+            // The dummy player's melds start with the real player's melds.
+            dummyPlayer.melds = player.melds.map(meld => [...meld]); 
+            // The rest of the hand is treated as one final meld.
             const handCardsAsMeld = player.hand.filter((c, i) => i !== selectedCardIndex);
-            if (handCardsAsMeld.length > 0) player.melds.push(handCardsAsMeld);
-            const result = this.game.validateDeclaration(this.game.current_player_index);
-            if (handCardsAsMeld.length > 0) player.melds.pop();
+            if (handCardsAsMeld.length > 0) {
+                dummyPlayer.melds.push(handCardsAsMeld);
+            }
+            
+            // Validate the dummy player's complete hand.
+            const result = this.game.validateDeclaration(dummyPlayer);
+            
             if (result.isValid) {
+                // If valid, apply the changes to the real player.
                 player.hand.splice(selectedCardIndex, 1);
-                if (player.hand.length > 0) player.melds.push(player.hand.splice(0, player.hand.length));
+                if (player.hand.length > 0) {
+                    player.melds.push(player.hand.splice(0, player.hand.length));
+                }
                 this.game.playerDiscardCard(finalDiscard);
                 const winnerIndex = this.game.current_player_index;
                 this.game.players.forEach((p, i) => {
@@ -350,6 +378,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 this.declarationResult = { isValid: true, winnerName: player.name, penaltyPlayer: null };
                 this.displayShowdownScreen();
             } else {
+                // If invalid, it's a wrong declaration.
                 this.game.endRound(null, this.game.current_player_index);
                 this.declarationResult = { isValid: false, winnerName: null, penaltyPlayer: player };
                 this.displayShowdownScreen();
@@ -374,23 +403,26 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
         handleCanvasClick(event) {
-            if (!this.game || this.game.turn_state === 'ROUND_OVER' || this.game.players[this.game.current_player_index].isAi || this.isAnimating) return;
+            if (!this.game || this.game.turn_state === 'ROUND_OVER' || this.isAnimating || this.game.players[this.game.current_player_index].isAi) {
+                return;
+            }
+
             const mouse = { x: event.clientX - this.canvas.getBoundingClientRect().left, y: event.clientY - this.canvas.getBoundingClientRect().top };
             
             if (this.game.turn_state === 'DRAW') {
-                this.pickedFromDiscardThisTurn = null; 
-                const stockPileRect = { x: C.SCREEN_WIDTH / 2 - C.CARD_WIDTH - 15, y: 40, width: C.CARD_WIDTH, height: C.CARD_HEIGHT };
-                const discardPileRect = { x: C.SCREEN_WIDTH / 2 + 15, y: 40, width: C.CARD_WIDTH, height: C.CARD_HEIGHT };
+                const stockPileRect = { x: 250, y: 40, width: C.CARD_WIDTH, height: C.CARD_HEIGHT };
+                const discardPileRect = { x: 350, y: 40, width: C.CARD_WIDTH, height: C.CARD_HEIGHT };
 
                 if (mouse.x >= stockPileRect.x && mouse.x <= stockPileRect.x + stockPileRect.width && mouse.y >= stockPileRect.y && mouse.y <= stockPileRect.y + stockPileRect.height) {
-                    this.drawCardAndAnimate(this.game.stock_pile.pop(), stockPileRect, true);
+                    this.drawCardAndAnimate(this.game.deck.deal(), stockPileRect, true);
                 } else if (mouse.x >= discardPileRect.x && mouse.x <= discardPileRect.x + discardPileRect.width && mouse.y >= discardPileRect.y && mouse.y <= discardPileRect.y + discardPileRect.height) {
                     const card = this.game.discard_pile.pop();
                     this.pickedFromDiscardThisTurn = card;
                     this.drawCardAndAnimate(card, discardPileRect, false);
                 }
             } else if (this.game.turn_state === 'ACTION') {
-                const handAndMeldY = 230;
+                // The rest of this function remains unchanged.
+                const handAndMeldY = 200;
 
                 for (let i = 0; i < this.ungroupButtonRects.length; i++) {
                     const rect = this.ungroupButtonRects[i];
@@ -511,6 +543,12 @@ document.addEventListener('DOMContentLoaded', () => {
         handleNextRound() {
             this.playSound('click');
             this.Elements.scoreboardScreen.style.display = 'none';
+
+            // --- THIS IS THE FIX ---
+            // We now reset the joker flip animation state for the new round.
+            this.jokerFlipState = { animating: false, phase: 1, currentWidth: 0 };
+            // -------------------------
+
             if (this.game.currentRound >= this.game.settings.numRounds) {
                 this.Elements.settingsScreen.style.display = 'block';
             } else {

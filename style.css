@@ -13,7 +13,10 @@ canvas {
 }
 
 .controls {
-    margin-top: 15px;
+    margin-top: 10px; /* Moved buttons closer to canvas */
+    display: flex; /* Added to enable centering */
+    justify-content: center; /* Added to center buttons */
+    width: 100%;
 }
 
 button {
@@ -177,7 +180,7 @@ button:disabled {
 }
 
 #debug-area {
-    width: 80%;
+    width: 800px;
     margin-top: 20px;
     padding: 15px;
     background-color: #f0f0f0; /* Light background for high contrast */
@@ -185,6 +188,7 @@ button:disabled {
     color: black;                /* Default text color for this area */
     font-family: 'Courier New', Courier, monospace;
     border-radius: 5px;
+    box-sizing: border-box; /* Add this for better sizing */
 }
 
 #debug-area h3 {
