@@ -217,8 +217,12 @@ export class RummyGameLogic {
         let finalMelds = [];
 
         const without = (source, items) => {
-            const itemSet = new Set(items.map(c => c.toString()));
-            return source.filter(c => !itemSet.has(c.toString()));
+            const remaining = [...source];
+            for (const item of items) {
+                const idx = remaining.findIndex(c => c.rank === item.rank && c.suit === item.suit);
+                if (idx > -1) remaining.splice(idx, 1);
+            }
+            return remaining;
         };
         const meldPoints = (meld) => meld.reduce((s, c) => s + c.getPoints(), 0);
 
