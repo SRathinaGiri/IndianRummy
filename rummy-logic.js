@@ -217,8 +217,12 @@ export class RummyGameLogic {
         let finalMelds = [];
 
         const without = (source, items) => {
-            const itemSet = new Set(items.map(c => c.toString()));
-            return source.filter(c => !itemSet.has(c.toString()));
+            const remaining = [...source];
+            for (const item of items) {
+                const idx = remaining.findIndex(c => c.rank === item.rank && c.suit === item.suit);
+                if (idx > -1) remaining.splice(idx, 1);
+            }
+            return remaining;
         };
         const meldPoints = (meld) => meld.reduce((s, c) => s + c.getPoints(), 0);
 
@@ -352,14 +356,14 @@ export class RummyGameLogic {
         let bestCardToDiscard = null;
         let discardPool = player.hand;
         if (discardPool.length === 0) {
-             if (player.melds.length > 0) {
+            if (player.melds.length > 0) {
                 player.melds.sort((a,b) => a.reduce((s,c)=>s+c.getPoints(),0) - b.reduce((s,c)=>s+c.getPoints(),0));
                 const meldToBreak = player.melds.shift();
                 discardPool = meldToBreak;
-             } else {
-                 player.lastDiscardedCard = drawnCard;
-                 return { drawn: drawnCard, discarded: drawnCard, declared: false };
-             }
+            } else {
+                player.lastDiscardedCard = drawnCard;
+                return { drawn: drawnCard, discarded: drawnCard, declared: false };
+            }
         }
         
         let lowestFutureScore = Infinity;
@@ -381,6 +385,10 @@ export class RummyGameLogic {
         const discardIndex = finalDiscardPool.indexOf(bestCardToDiscard);
         if (discardIndex > -1) {
             finalDiscardPool.splice(discardIndex, 1);
+        }
+        if (player.hand.length === 0 && finalDiscardPool !== player.hand) {
+            // We broke a meld to discard, so the remaining cards become the new hand
+            player.hand = finalDiscardPool;
         }
         
         player.lastDiscardedCard = bestCardToDiscard;
