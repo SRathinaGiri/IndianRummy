@@ -1,6 +1,6 @@
 const CACHE_NAME = 'rummy-game-cache-v3'; // Updated cache name to force a new install
 const urlsToCache = [
-  '/',
+  './',
   'index.html',
   'how-to-play.html', // Added for offline access
   'style.css',
