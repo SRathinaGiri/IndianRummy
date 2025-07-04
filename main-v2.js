@@ -17,6 +17,7 @@ document.addEventListener('DOMContentLoaded', () => {
         nextAction: null,
         messageTimer: null,
         jokerFlipState: { animating: false, phase: 1, currentWidth: 0 },
+        fastMode: false,
 
         // --- DOM Elements & Context ---
         canvas: document.getElementById('gameCanvas'),
@@ -71,6 +72,7 @@ document.addEventListener('DOMContentLoaded', () => {
         },
 
         playSound(name) {
+            if (this.fastMode) return;
             const sound = this.assets.sounds[name];
             if (sound) {
                 sound.currentTime = 0;
@@ -101,14 +103,16 @@ document.addEventListener('DOMContentLoaded', () => {
                 alert("Card images have not finished loading yet. Please wait a moment.");
                 return;
             }
-            this.playSound('shuffle');
-            
+
             const settings = {
                 numPlayers: document.getElementById('num-players').value,
                 numRounds: document.getElementById('num-rounds').value,
                 hiddenJoker: document.getElementById('hidden-joker').checked,
-                debugMode: document.getElementById('debug-mode').checked
+                debugMode: document.getElementById('debug-mode').checked,
+                fastMode: document.getElementById('fast-mode').checked
             };
+            this.fastMode = settings.fastMode;
+            this.playSound('shuffle');
 
             this.Elements.settingsScreen.style.display = 'none';
             this.Elements.scoreboardScreen.style.display = 'none';
@@ -138,6 +142,18 @@ document.addEventListener('DOMContentLoaded', () => {
                     const card = this.game.deck.deal();
                     if (card) dealtCards[p_idx].push(card);
                 }
+            }
+
+            if (this.fastMode) {
+                for (let p_idx = 0; p_idx < this.game.players.length; p_idx++) {
+                    this.game.players[p_idx].addCards(dealtCards[p_idx]);
+                }
+                this.humanPlayer.sortHand();
+                this.isAnimating = false;
+                this.game.turn_state = 'DRAW';
+                this.setMessage('Your turn to draw.', 3000);
+                this.checkAiTurn();
+                return;
             }
             const animationPromises = [];
             for (let i = 0; i < 13; i++) {
@@ -484,7 +500,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         },
         
-        sleep(ms) { return new Promise(resolve => setTimeout(resolve, ms)); },
+        sleep(ms) { return new Promise(resolve => setTimeout(resolve, this.fastMode ? 0 : ms)); },
 
         setMessage(text, duration = 2000) {
             if (!this.game) return;
@@ -496,6 +512,10 @@ document.addEventListener('DOMContentLoaded', () => {
         },
 
         animateCard(card, startPos, endPos, onComplete, showBack = false, speed = 0.15) {
+            if (this.fastMode) {
+                if (onComplete) onComplete();
+                return;
+            }
             const animation = {
                 card, x: startPos.x, y: startPos.y, targetX: endPos.x, targetY: endPos.y, showBack, speed,
                 update: function() {
