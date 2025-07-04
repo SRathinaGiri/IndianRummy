@@ -513,7 +513,22 @@ document.addEventListener('DOMContentLoaded', () => {
 
         animateCard(card, startPos, endPos, onComplete, showBack = false, speed = 0.15) {
             if (this.fastMode) {
-                if (onComplete) onComplete();
+                this.isAnimating = true;
+                const finalize = () => {
+                    this.isAnimating = false;
+                    if (this.nextAction) {
+                        const action = this.nextAction;
+                        this.nextAction = null;
+                        action();
+                    }
+                };
+
+                const result = onComplete ? onComplete() : null;
+                if (result && typeof result.then === 'function') {
+                    result.then(finalize);
+                } else {
+                    finalize();
+                }
                 return;
             }
             const animation = {
