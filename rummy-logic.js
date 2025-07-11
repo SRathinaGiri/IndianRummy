@@ -115,13 +115,34 @@ export class RummyGameLogic {
     }
 
    isPureSequence(meld, player) {
-        // To be a pure sequence, a meld must first be a valid run.
+        // A pure sequence must first be a valid run
         if (!this._validateRun(meld, player)) {
             return false;
         }
-        // And it must contain NO jokers (neither printed nor wild).
-        const hasJoker = meld.some(card => this.isJoker(card, player));
-        return !hasJoker;
+
+        // If any printed joker is present it can never be pure
+        if (meld.some(card => card.rank === 'JOKER')) {
+            return false;
+        }
+
+        // When the player hasn't seen the joker yet (or when a falsy value is
+        // passed instead of a player object) jokers are not considered, so the
+        // above checks are sufficient.
+        if (!player || !player.hasSeenJoker || !this.wild_joker) {
+            return true;
+        }
+
+        // At this point the player knows the wild joker. If the sequence
+        // contains any card of the wild joker's rank, it might still be a pure
+        // run if that card is used naturally (e.g., 4♦ 5♦ 6♦ when 5s are wild).
+        if (meld.some(card => card.rank === this.wild_joker.rank)) {
+            const tempPlayer = new Player('temp', true);
+            tempPlayer.hasSeenJoker = false; // Treat wild jokers as normal
+            return this._validateRun(meld, tempPlayer);
+        }
+
+        // No jokers of any kind are present
+        return true;
     }
 
     _validateRun(cards, player) {
