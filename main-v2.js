@@ -18,6 +18,7 @@ document.addEventListener('DOMContentLoaded', () => {
         messageTimer: null,
         jokerFlipState: { animating: false, phase: 1, currentWidth: 0 },
         fastMode: false,
+        pendingAiDeclaration: null,
 
         // --- DOM Elements & Context ---
         canvas: document.getElementById('gameCanvas'),
@@ -120,6 +121,8 @@ document.addEventListener('DOMContentLoaded', () => {
             this.Elements.gameContainer.style.display = 'block';
             this.Elements.debugArea.style.display = settings.debugMode ? 'block' : 'none';
 
+            this.pendingAiDeclaration = null;
+
             const playerNames = ['You'];
             for (let i = 0; i < parseInt(settings.numPlayers, 10); i++) {
                 playerNames.push(`Computer ${i + 1}`);
@@ -208,12 +211,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 if (turnResult.declared) {
                     this.playSound('declare');
-                    this.setMessage(`${currentPlayer.name} has declared!`);
-                    await this.sleep(2000); 
-                    this.game.endRound(this.game.current_player_index, null);
-                    this.declarationResult = { isValid: true, winnerName: currentPlayer.name, penaltyPlayer: null };
-                    this.displayShowdownScreen();
-                    return; 
+                    this.setMessage(`${currentPlayer.name} has declared! Arrange your cards and press Show.`);
+                    await this.sleep(1000);
+                    this.pendingAiDeclaration = {
+                        winnerIndex: this.game.current_player_index,
+                        discarded: turnResult.discarded,
+                        winnerName: currentPlayer.name
+                    };
+                    this.game.current_player_index = 0;
+                    this.game.turn_state = 'ACTION';
+                    return;
                 }
                 
                 if (turnResult && turnResult.drawn) {
@@ -359,6 +366,10 @@ document.addEventListener('DOMContentLoaded', () => {
         },
 
         handleDeclare() {
+            if (this.pendingAiDeclaration) {
+                this.finalizeAiDeclaration();
+                return;
+            }
             this.playSound('declare');
             const player = this.game.players[this.game.current_player_index];
             const selectedCardIndex = player.selectedIndices[0];
@@ -399,6 +410,18 @@ document.addEventListener('DOMContentLoaded', () => {
                 this.declarationResult = { isValid: false, winnerName: null, penaltyPlayer: player };
                 this.displayShowdownScreen();
             }
+        },
+
+        finalizeAiDeclaration() {
+            const { winnerIndex, discarded, winnerName } = this.pendingAiDeclaration;
+            if (discarded) {
+                this.game.playerDiscardCard(discarded);
+            }
+            this.game.endRound(winnerIndex, null);
+            this.declarationResult = { isValid: true, winnerName, penaltyPlayer: null };
+            this.pendingAiDeclaration = null;
+            this.Elements.declareButton.textContent = 'Declare';
+            this.displayShowdownScreen();
         },
         
         drawCardAndAnimate(card, startPos, showBack) {
@@ -578,6 +601,8 @@ document.addEventListener('DOMContentLoaded', () => {
         handleNextRound() {
             this.playSound('click');
             this.Elements.scoreboardScreen.style.display = 'none';
+
+            this.pendingAiDeclaration = null;
 
             // --- THIS IS THE FIX ---
             // We now reset the joker flip animation state for the new round.
