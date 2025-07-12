@@ -35,6 +35,18 @@ export function updateButtons(App) {
     const totalCardsInHand = humanPlayer.hand.length;
     const selectionSize = humanPlayer.selectedIndices.length;
 
+    if (App.pendingAiDeclaration) {
+        Elements.sortButton.disabled = App.isAnimating;
+        Elements.meldButton.disabled = selectionSize < 3 || App.isAnimating;
+        Elements.discardButton.disabled = true;
+        Elements.declareButton.disabled = App.isAnimating;
+        Elements.declareButton.textContent = 'Show';
+        Elements.revealJokerButton.disabled = true;
+        return;
+    }
+
+    Elements.declareButton.textContent = 'Declare';
+
     Elements.sortButton.disabled = App.isAnimating;
     Elements.meldButton.disabled = !(isMyTurn && game.turn_state === 'ACTION' && selectionSize >= 3);
     Elements.discardButton.disabled = !(isMyTurn && game.turn_state === 'ACTION' && (totalCardsInHand + humanPlayer.melds.flat().length) === 14 && selectionSize === 1);
