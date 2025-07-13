@@ -96,7 +96,14 @@ function drawStatusText(App) {
     }
 
     const currentPlayer = game.players[game.current_player_index];
-    const statusText = currentPlayer.isAi ? `${currentPlayer.name}'s Turn` : `Your Turn: ${game.turn_state}`;
+    let statusText;
+    if (currentPlayer.isAi) {
+        statusText = `${currentPlayer.name}'s Turn`;
+    } else {
+        statusText = App.pendingAiDeclaration ?
+            'Computer won! Arrange and show' :
+            `Your Turn: ${game.turn_state}`;
+    }
     ctx.font = '16px Tahoma';
     ctx.fillStyle = '#FFD700';
     ctx.fillText(statusText, statusX, 150);
