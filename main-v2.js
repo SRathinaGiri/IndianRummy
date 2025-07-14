@@ -629,8 +629,10 @@ document.addEventListener('DOMContentLoaded', () => {
         displayScoreboard() {
             const scoreTable = document.getElementById('score-table');
             const roundWinnerText = document.getElementById('round-winner-text');
+            const gameWinnerText = document.getElementById('game-winner-text');
             const nextRoundBtn = document.getElementById('next-round-btn');
             this.Elements.scoreboardScreen.style.display = 'block';
+            gameWinnerText.textContent = '';
             if (this.declarationResult.penaltyPlayer) {
                  roundWinnerText.textContent = `${this.declarationResult.penaltyPlayer.name} made a wrong declaration!`;
             } else {
@@ -645,6 +647,13 @@ document.addEventListener('DOMContentLoaded', () => {
             });
             scoreTable.appendChild(tbody);
             if (this.game.currentRound >= this.game.settings.numRounds) {
+                const lowest = Math.min(...this.game.scores);
+                const winnerIndex = this.game.scores.indexOf(lowest);
+                const winnerName = this.game.players[winnerIndex].name;
+                gameWinnerText.textContent =
+                    winnerIndex === 0
+                        ? `Congratulations! You win the game with ${lowest} points!`
+                        : `${winnerName} wins the game with ${lowest} points!`;
                 nextRoundBtn.textContent = 'New Game';
             } else {
                 nextRoundBtn.textContent = 'Next Round';
