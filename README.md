@@ -42,4 +42,4 @@ The objective is to be the first to arrange all 13 of your cards into valid sequ
 3.  **Discard:** You must end your turn by discarding one card to the Discard pile.
 
 ---
-*This game was built by S. Rathinagiri, working as a coding partner with Google Gemini.*
+*This game was built by S. Rathinagiri, working as a coding partner with Google Gemini and ChatGPT Codex.*
