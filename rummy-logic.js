@@ -309,10 +309,16 @@ export class RummyGameLogic {
         tempPlayer.hasSeenJoker = player.hasSeenJoker;
         this.autoMeld(tempPlayer);
         let score = tempPlayer.hand.reduce((s, c) => s + c.getPoints(), 0);
+        // Penalize holding high value cards when similar ranks were already discarded
+        for (const c of tempPlayer.hand) {
+            if (c.getPoints() >= 10 && this.discard_history.some(d => d.rank === c.rank)) {
+                score += 5; // increase potential score to discourage waiting
+            }
+        }
         if (tempPlayer.melds.length > 0) {
              const validation = this.validateDeclaration(tempPlayer);
              if (validation.isValid) {
-                 score -= 100; 
+                 score -= 100;
              } else {
                  score -= tempPlayer.melds.length * 10;
              }
@@ -388,15 +394,47 @@ export class RummyGameLogic {
         }
         
         let lowestFutureScore = Infinity;
+        let candidateDiscards = [];
         for (const potentialDiscard of discardPool) {
             if (this.isJoker(potentialDiscard, player) && discardPool.length > 1) continue;
             const tempHand = discardPool.filter(c => c !== potentialDiscard);
-            const futureEval = this._evaluateHandPotential(tempHand, player);
+            let futureEval = this._evaluateHandPotential(tempHand, player);
+            if (potentialDiscard.getPoints() >= 10 && this.discard_history.some(d => d.rank === potentialDiscard.rank)) {
+                futureEval -= 5; // prefer discarding high value cards already seen discarded
+            }
             if (futureEval < lowestFutureScore) {
                 lowestFutureScore = futureEval;
-                bestCardToDiscard = potentialDiscard;
+                candidateDiscards = [potentialDiscard];
+            } else if (futureEval === lowestFutureScore) {
+                candidateDiscards.push(potentialDiscard);
             }
         }
+
+        if (candidateDiscards.length > 1) {
+            const prevDiscarded = candidateDiscards.filter(c => this.discard_history.some(d => d.rank === c.rank));
+            if (prevDiscarded.length > 0) candidateDiscards = prevDiscarded;
+        }
+
+        const nextIndex = (this.current_player_index + 1) % this.players.length;
+        const nextLog = this.pickup_log[nextIndex] || [];
+        const lastPickup = nextLog[nextLog.length - 1];
+        if (candidateDiscards.length > 1 && lastPickup) {
+            const lastRank = this.rankMap.get(lastPickup.rank);
+            candidateDiscards = candidateDiscards.filter(c => {
+                const r = this.rankMap.get(c.rank);
+                if (c.rank === lastPickup.rank) return false;
+                if (c.suit === lastPickup.suit && Math.abs(r - lastRank) <= 1) return false;
+                return true;
+            });
+            if (candidateDiscards.length === 0) candidateDiscards = [prevDiscarded ? prevDiscarded[0] : discardPool[0]];
+        }
+
+        if (candidateDiscards.length === 0) {
+            candidateDiscards = discardPool;
+        }
+
+        candidateDiscards.sort((a,b)=>b.getPoints()-a.getPoints());
+        bestCardToDiscard = candidateDiscards[0];
         
         if (!bestCardToDiscard) {
              bestCardToDiscard = discardPool.sort((a,b)=>b.getPoints()-a.getPoints())[0];
