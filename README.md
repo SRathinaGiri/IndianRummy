@@ -5,7 +5,7 @@ This is a fully-featured, web-based Rummy card game built with HTML, CSS, and mo
 ## Features
 
 - **Classic Indian Rummy Rules:** Plays with 1 human player against 1 to 3 AI opponents, using a multi-deck shoe of cards.
-- **Smart AI Opponent:** The AI evaluates its hand to make strategic decisions, knows when it has a winning hand, and will declare to win the round.
+- **Smart AI Opponent:** The AI evaluates its hand to make strategic decisions, keeps track of discarded cards and opponent pickups, and will declare to win the round.
 - **Progressive Web App (PWA):** The game can be "installed" on a desktop or mobile home screen for a native app-like experience.
 - **Offline Capable:** Thanks to a service worker, the game caches all necessary assets and can be played anytime, anywhere, even without an internet connection.
 - **Authentic Rules Implemented:**
