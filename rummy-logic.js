@@ -479,11 +479,39 @@ export class RummyGameLogic {
         if (this.turn_state === 'ROUND_OVER' && this.current_player_index === playerIndex && this.penaltyPlayerIndex === null) return 0;
         
         let totalPoints = 0;
+
+        // Count points from cards in hand
         playerObj.hand.forEach(card => {
             if (!this.isJoker(card, playerObj)) {
                 totalPoints += card.getPoints();
             }
         });
+
+        // Evaluate melds as arranged by the player
+        let runCount = 0;
+        let pureRunCount = 0;
+        playerObj.melds.forEach(meld => {
+            if (this._validateRun(meld, playerObj)) {
+                runCount++;
+                if (this.isPureSequence(meld, playerObj)) {
+                    pureRunCount++;
+                }
+            }
+        });
+
+        const canMeldSets = runCount >= 2 && pureRunCount >= 1;
+        playerObj.melds.forEach(meld => {
+            const isRun = this._validateRun(meld, playerObj);
+            const isSet = this._validateSet(meld, playerObj);
+            if (!isRun && !(isSet && canMeldSets)) {
+                meld.forEach(card => {
+                    if (!this.isJoker(card, playerObj)) {
+                        totalPoints += card.getPoints();
+                    }
+                });
+            }
+        });
+
         return totalPoints;
     }
 
@@ -538,7 +566,9 @@ export class RummyGameLogic {
         if (winnerIndex !== null) this.current_player_index = winnerIndex;
         this.penaltyPlayerIndex = penaltyPlayerIndex;
         this.players.forEach((p, i) => {
-            if (i !== winnerIndex) this.autoMeld(p) 
+            if (i !== winnerIndex && p.isAi) {
+                this.autoMeld(p);
+            }
         });
         this.calculateScores(winnerIndex, penaltyPlayerIndex);
     }
