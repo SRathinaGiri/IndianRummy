@@ -19,6 +19,7 @@ document.addEventListener('DOMContentLoaded', () => {
         jokerFlipState: { animating: false, phase: 1, currentWidth: 0 },
         fastMode: false,
         pendingAiDeclaration: null,
+        winLosses: [],
 
         // --- DOM Elements & Context ---
         canvas: document.getElementById('gameCanvas'),
@@ -81,6 +82,36 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         },
 
+        // --- Score Persistence ---
+        loadScoreHistory() {
+            this.winLosses = new Array(this.game.players.length).fill(0);
+            const raw = localStorage.getItem('rummyScoreHistory');
+            if (!raw) return;
+            try {
+                const data = JSON.parse(raw);
+                if (Array.isArray(data.scores) && data.scores.length === this.game.players.length) {
+                    this.game.scores = data.scores;
+                }
+                if (Array.isArray(data.wins) && data.wins.length === this.game.players.length) {
+                    this.winLosses = data.wins;
+                }
+                if (typeof data.round === 'number') {
+                    this.game.currentRound = data.round;
+                }
+            } catch (e) {
+                console.error('Failed to parse score history', e);
+            }
+        },
+
+        saveScoreHistory() {
+            const data = {
+                round: this.game.currentRound,
+                scores: this.game.scores,
+                wins: this.winLosses
+            };
+            localStorage.setItem('rummyScoreHistory', JSON.stringify(data));
+        },
+
         // --- Game Loop ---
         gameLoop() {
             if (!this.game) return;
@@ -130,7 +161,9 @@ document.addEventListener('DOMContentLoaded', () => {
            
             this.game = new RummyGameLogic(playerNames, settings);
             this.humanPlayer = this.game.players[0];
-            
+
+            this.loadScoreHistory();
+
             this.gameLoop();
             this.animateInitialDeal();
         },
@@ -610,6 +643,10 @@ document.addEventListener('DOMContentLoaded', () => {
             // -------------------------
 
             if (this.game.currentRound >= this.game.settings.numRounds) {
+                // Clear persisted score history so a fresh game can start
+                localStorage.removeItem('rummyScoreHistory');
+                this.winLosses = [];
+                this.game = null;
                 this.Elements.settingsScreen.style.display = 'block';
             } else {
                 this.playSound('shuffle');
@@ -637,13 +674,22 @@ document.addEventListener('DOMContentLoaded', () => {
                  roundWinnerText.textContent = `${this.declarationResult.penaltyPlayer.name} made a wrong declaration!`;
             } else {
                 roundWinnerText.textContent = `${this.declarationResult.winnerName} won Round ${this.game.currentRound}!`;
+                const winnerIndex = this.game.players.findIndex(p => p.name === this.declarationResult.winnerName);
+                if (winnerIndex >= 0) {
+                    this.winLosses[winnerIndex] = (this.winLosses[winnerIndex] || 0) + 1;
+                }
             }
-            scoreTable.innerHTML = '<thead><tr><th>Player</th><th>Score</th></tr></thead>';
+
+            this.saveScoreHistory();
+
+            scoreTable.innerHTML = '<thead><tr><th>Player</th><th>Score</th><th>Wins</th><th>Losses</th></tr></thead>';
             const tbody = document.createElement('tbody');
             this.game.players.forEach((player, index) => {
                 const row = tbody.insertRow();
                 row.insertCell().textContent = player.name;
                 row.insertCell().textContent = this.game.scores[index];
+                row.insertCell().textContent = this.winLosses[index];
+                row.insertCell().textContent = this.game.currentRound - this.winLosses[index];
             });
             scoreTable.appendChild(tbody);
             if (this.game.currentRound >= this.game.settings.numRounds) {

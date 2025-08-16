@@ -15,6 +15,7 @@ This is a fully-featured, web-based Rummy card game built with HTML, CSS, and mo
   - Correct point calculation for opponents' deadwood on declaration.
 - **Learner Mode:** An optional mode to see the AI's cards and its calculated potential points in real-time, perfect for learning the game's strategy.
 - **Smooth Animations:** All player actions, such as dealing, drawing, and discarding, are represented by clean and logical animations.
+- **Persistent Scoreboard:** Scores and win/loss counts are saved in your browser's local storage so you can continue tracking progress across sessions.
 
 ## How to Run Locally
 
