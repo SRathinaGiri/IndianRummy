@@ -86,7 +86,7 @@ document.addEventListener('DOMContentLoaded', () => {
         loadScoreHistory() {
             this.winLosses = new Array(this.game.players.length).fill(0);
             const raw = localStorage.getItem('rummyScoreHistory');
-            if (!raw) return;
+            if (!raw) return false;
             try {
                 const data = JSON.parse(raw);
                 if (Array.isArray(data.scores) && data.scores.length === this.game.players.length) {
@@ -98,8 +98,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (typeof data.round === 'number') {
                     this.game.currentRound = data.round;
                 }
+                return true;
             } catch (e) {
                 console.error('Failed to parse score history', e);
+                return false;
             }
         },
 
@@ -162,10 +164,15 @@ document.addEventListener('DOMContentLoaded', () => {
             this.game = new RummyGameLogic(playerNames, settings);
             this.humanPlayer = this.game.players[0];
 
-            this.loadScoreHistory();
+            const hasHistory = this.loadScoreHistory();
 
             this.gameLoop();
-            this.animateInitialDeal();
+
+            if (hasHistory) {
+                this.displayScoreboard(true);
+            } else {
+                this.animateInitialDeal();
+            }
         },
 
         async animateInitialDeal() {
@@ -663,24 +670,27 @@ document.addEventListener('DOMContentLoaded', () => {
             this.displayScoreboard();
         },
 
-        displayScoreboard() {
+        displayScoreboard(initial = false) {
             const scoreTable = document.getElementById('score-table');
             const roundWinnerText = document.getElementById('round-winner-text');
             const gameWinnerText = document.getElementById('game-winner-text');
             const nextRoundBtn = document.getElementById('next-round-btn');
             this.Elements.scoreboardScreen.style.display = 'block';
             gameWinnerText.textContent = '';
-            if (this.declarationResult.penaltyPlayer) {
-                 roundWinnerText.textContent = `${this.declarationResult.penaltyPlayer.name} made a wrong declaration!`;
-            } else {
-                roundWinnerText.textContent = `${this.declarationResult.winnerName} won Round ${this.game.currentRound}!`;
-                const winnerIndex = this.game.players.findIndex(p => p.name === this.declarationResult.winnerName);
-                if (winnerIndex >= 0) {
-                    this.winLosses[winnerIndex] = (this.winLosses[winnerIndex] || 0) + 1;
+            if (!initial && this.declarationResult) {
+                if (this.declarationResult.penaltyPlayer) {
+                    roundWinnerText.textContent = `${this.declarationResult.penaltyPlayer.name} made a wrong declaration!`;
+                } else {
+                    roundWinnerText.textContent = `${this.declarationResult.winnerName} won Round ${this.game.currentRound}!`;
+                    const winnerIndex = this.game.players.findIndex(p => p.name === this.declarationResult.winnerName);
+                    if (winnerIndex >= 0) {
+                        this.winLosses[winnerIndex] = (this.winLosses[winnerIndex] || 0) + 1;
+                    }
                 }
+                this.saveScoreHistory();
+            } else {
+                roundWinnerText.textContent = `Current standings after Round ${this.game.currentRound}`;
             }
-
-            this.saveScoreHistory();
 
             scoreTable.innerHTML = '<thead><tr><th>Player</th><th>Score</th><th>Wins</th><th>Losses</th></tr></thead>';
             const tbody = document.createElement('tbody');
