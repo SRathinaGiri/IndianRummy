@@ -9,7 +9,9 @@ export function initializeUI(App) {
         settingsScreen: document.getElementById('settings-screen'),
         gameContainer: document.getElementById('game-container'),
         startGameBtn: document.getElementById('start-game-btn'),
+        showStatsBtn: document.getElementById('show-stats-btn'),
         nextRoundBtn: document.getElementById('next-round-btn'),
+        closeStatsBtn: document.getElementById('close-stats-btn'),
         continueToScoreboardBtn: document.getElementById('continue-to-scoreboard-btn'),
         scoreboardScreen: document.getElementById('scoreboard-screen'),
         showdownScreen: document.getElementById('showdown-screen'),
@@ -17,6 +19,7 @@ export function initializeUI(App) {
     };
 
     Elements.startGameBtn.addEventListener('click', () => App.startGame());
+    Elements.showStatsBtn.addEventListener('click', () => App.displaySavedStats());
     Elements.nextRoundBtn.addEventListener('click', () => App.handleNextRound());
     Elements.sortButton.addEventListener('click', () => App.handleSort());
     Elements.meldButton.addEventListener('click', () => App.handleMeld());
@@ -24,6 +27,7 @@ export function initializeUI(App) {
     Elements.declareButton.addEventListener('click', () => App.handleDeclare());
     Elements.revealJokerButton.addEventListener('click', () => App.handleRevealJoker());
     Elements.continueToScoreboardBtn.addEventListener('click', () => App.handleContinueToScoreboard());
+    Elements.closeStatsBtn.addEventListener('click', () => App.handleCloseStats());
 
     return Elements;
 }

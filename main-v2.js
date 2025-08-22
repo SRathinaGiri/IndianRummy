@@ -45,7 +45,7 @@ document.addEventListener('DOMContentLoaded', () => {
             this.loadAssets();
             this.Elements = UI.initializeUI(this);
             this.canvas.addEventListener('click', (e) => this.handleCanvasClick(e));
-            
+
             // --- SERVICE WORKER RE-ENABLED ---
             if ('serviceWorker' in navigator) {
                 window.addEventListener('load', () => {
@@ -56,6 +56,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     });
                 });
             }
+            this.displaySavedStats(true);
         },
 
         loadAssets() {
@@ -95,6 +96,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (Array.isArray(data.wins) && data.wins.length === this.game.players.length) {
                     this.winLosses = data.wins;
                 }
+                if (Array.isArray(data.players) && data.players.length === this.game.players.length) {
+                    data.players.forEach((name, i) => {
+                        this.game.players[i].name = name;
+                    });
+                }
                 if (typeof data.round === 'number') {
                     this.game.currentRound = data.round;
                 }
@@ -109,7 +115,8 @@ document.addEventListener('DOMContentLoaded', () => {
             const data = {
                 round: this.game.currentRound,
                 scores: this.game.scores,
-                wins: this.winLosses
+                wins: this.winLosses,
+                players: this.game.players.map(p => p.name)
             };
             localStorage.setItem('rummyScoreHistory', JSON.stringify(data));
         },
@@ -675,8 +682,13 @@ document.addEventListener('DOMContentLoaded', () => {
             const roundWinnerText = document.getElementById('round-winner-text');
             const gameWinnerText = document.getElementById('game-winner-text');
             const nextRoundBtn = document.getElementById('next-round-btn');
+            const closeStatsBtn = document.getElementById('close-stats-btn');
             this.Elements.scoreboardScreen.style.display = 'block';
             gameWinnerText.textContent = '';
+
+            nextRoundBtn.style.display = 'inline-block';
+            closeStatsBtn.style.display = 'none';
+
             if (!initial && this.declarationResult) {
                 if (this.declarationResult.penaltyPlayer) {
                     roundWinnerText.textContent = `${this.declarationResult.penaltyPlayer.name} made a wrong declaration!`;
@@ -715,6 +727,59 @@ document.addEventListener('DOMContentLoaded', () => {
                 nextRoundBtn.textContent = 'Next Round';
             }
         },
+
+
+        displaySavedStats(initial = false) {
+            const raw = localStorage.getItem('rummyScoreHistory');
+            if (!raw) {
+                if (!initial) {
+                    alert('No saved statistics found.');
+                }
+                return;
+            }
+            try {
+                const data = JSON.parse(raw);
+                const scoreTable = document.getElementById('score-table');
+                const roundWinnerText = document.getElementById('round-winner-text');
+                const gameWinnerText = document.getElementById('game-winner-text');
+                const nextRoundBtn = document.getElementById('next-round-btn');
+                const closeStatsBtn = document.getElementById('close-stats-btn');
+                this.Elements.settingsScreen.style.display = 'none';
+                this.Elements.showdownScreen.style.display = 'none';
+                this.Elements.gameContainer.style.display = 'none';
+                this.Elements.scoreboardScreen.style.display = 'block';
+                nextRoundBtn.style.display = 'none';
+                closeStatsBtn.style.display = 'inline-block';
+                gameWinnerText.textContent = '';
+                const round = typeof data.round === 'number' ? data.round : 0;
+                roundWinnerText.textContent = `Saved standings after Round ${round}`;
+
+                scoreTable.innerHTML = '<thead><tr><th>Player</th><th>Score</th><th>Wins</th><th>Losses</th></tr></thead>';
+                const tbody = document.createElement('tbody');
+                const names = (data.players && data.players.length)
+                    ? data.players
+                    : data.scores.map((_, i) => (i === 0 ? 'You' : `Computer ${i}`));
+                names.forEach((name, index) => {
+                    const row = tbody.insertRow();
+                    row.insertCell().textContent = name;
+                    row.insertCell().textContent = data.scores[index];
+                    const wins = data.wins ? data.wins[index] : 0;
+                    row.insertCell().textContent = wins;
+                    row.insertCell().textContent = round - wins;
+                });
+                scoreTable.appendChild(tbody);
+            } catch (e) {
+                console.error('Failed to display saved stats', e);
+            }
+        },
+
+        handleCloseStats() {
+            this.Elements.scoreboardScreen.style.display = 'none';
+            this.Elements.closeStatsBtn.style.display = 'none';
+            this.Elements.nextRoundBtn.style.display = 'block';
+            this.Elements.settingsScreen.style.display = 'block';
+        },
+
 
         handleRevealJoker() {
             this.playSound('click');
