@@ -56,7 +56,6 @@ document.addEventListener('DOMContentLoaded', () => {
                     });
                 });
             }
-            this.displaySavedStats(true);
         },
 
         loadAssets() {

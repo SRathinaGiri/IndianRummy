@@ -19,7 +19,9 @@ export function initializeUI(App) {
     };
 
     Elements.startGameBtn.addEventListener('click', () => App.startGame());
-    Elements.showStatsBtn.addEventListener('click', () => App.displaySavedStats());
+    Elements.showStatsBtn.addEventListener('click', () => {
+        window.location.href = 'dashboard.html';
+    });
     Elements.nextRoundBtn.addEventListener('click', () => App.handleNextRound());
     Elements.sortButton.addEventListener('click', () => App.handleSort());
     Elements.meldButton.addEventListener('click', () => App.handleMeld());
