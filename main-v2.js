@@ -753,11 +753,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
                 return;
             }
+
             const scoreTable = document.getElementById('score-table');
             const roundWinnerText = document.getElementById('round-winner-text');
             const gameWinnerText = document.getElementById('game-winner-text');
             const nextRoundBtn = document.getElementById('next-round-btn');
             const closeStatsBtn = document.getElementById('close-stats-btn');
+
             this.Elements.settingsScreen.style.display = 'none';
             this.Elements.showdownScreen.style.display = 'none';
             this.Elements.gameContainer.style.display = 'none';
@@ -766,56 +768,70 @@ document.addEventListener('DOMContentLoaded', () => {
             closeStatsBtn.style.display = 'inline-block';
             gameWinnerText.textContent = '';
 
+            // --- Aggregate statistics for the human player only ---
+            let gamesPlayed = 0;
+            let roundsPlayed = 0;
+            let gamesWon = 0;
+            let roundsWon = 0;
+            let goldenWins = 0;
+
+            if (rawHistory) {
+                try {
+                    const history = JSON.parse(rawHistory);
+                    history.forEach(game => {
+                        gamesPlayed += 1;
+                        roundsPlayed += game.round || 0;
+                        const wins = Array.isArray(game.wins) ? (game.wins[0] || 0) : 0;
+                        roundsWon += wins;
+                        if (Array.isArray(game.scores)) {
+                            const lowest = Math.min(...game.scores);
+                            if (game.scores[0] === lowest) {
+                                gamesWon += 1;
+                                if (game.scores[0] === 0) {
+                                    goldenWins += 1;
+                                }
+                            }
+                        }
+                    });
+                } catch (e) {
+                    console.error('Failed to parse saved game history', e);
+                }
+            }
+
             if (rawCurrent) {
                 try {
                     const data = JSON.parse(rawCurrent);
-                    const round = typeof data.round === 'number' ? data.round : 0;
-                    roundWinnerText.textContent = `Saved standings after Round ${round}`;
-                    scoreTable.innerHTML = '<thead><tr><th>Player</th><th>Score</th><th>Wins</th><th>Losses</th></tr></thead>';
-                    const tbody = document.createElement('tbody');
-                    const names = (data.players && data.players.length)
-                        ? data.players
-                        : data.scores.map((_, i) => (i === 0 ? 'You' : `Computer ${i}`));
-                    names.forEach((name, index) => {
-                        const row = tbody.insertRow();
-                        row.insertCell().textContent = name;
-                        row.insertCell().textContent = data.scores[index];
-                        const wins = data.wins ? data.wins[index] : 0;
-                        row.insertCell().textContent = wins;
-                        row.insertCell().textContent = round - wins;
-                    });
-                    scoreTable.appendChild(tbody);
+                    gamesPlayed += 1; // current game in progress
+                    roundsPlayed += data.round || 0;
+                    if (Array.isArray(data.wins)) {
+                        roundsWon += data.wins[0] || 0;
+                    }
                 } catch (e) {
-                    console.error('Failed to display saved stats', e);
-                }
-            } else if (rawHistory) {
-                try {
-                    const history = JSON.parse(rawHistory);
-                    roundWinnerText.textContent = 'Completed Game History';
-                    scoreTable.innerHTML = '<thead><tr><th>Player</th><th>Score</th><th>Wins</th><th>Losses</th></tr></thead>';
-                    const tbody = document.createElement('tbody');
-                    history.forEach((game, idx) => {
-                        const headerRow = tbody.insertRow();
-                        const headerCell = headerRow.insertCell();
-                        headerCell.textContent = `Game ${idx + 1}`;
-                        headerCell.colSpan = 4;
-                        const names = (game.players && game.players.length)
-                            ? game.players
-                            : game.scores.map((_, i) => (i === 0 ? 'You' : `Computer ${i}`));
-                        names.forEach((name, index) => {
-                            const row = tbody.insertRow();
-                            row.insertCell().textContent = name;
-                            row.insertCell().textContent = game.scores[index];
-                            const wins = game.wins ? game.wins[index] : 0;
-                            row.insertCell().textContent = wins;
-                            row.insertCell().textContent = game.round - wins;
-                        });
-                    });
-                    scoreTable.appendChild(tbody);
-                } catch (e) {
-                    console.error('Failed to display saved stats', e);
+                    console.error('Failed to parse current game stats', e);
                 }
             }
+
+            const roundsLost = roundsPlayed - roundsWon;
+            const gamesLost = gamesPlayed - gamesWon;
+
+            roundWinnerText.textContent = 'Statistics Summary';
+            scoreTable.innerHTML = '<thead><tr><th>Statistic</th><th>Value</th></tr></thead>';
+            const tbody = document.createElement('tbody');
+            const stats = [
+                ['🎮 Games Played', gamesPlayed],
+                ['🏆 Games Won', gamesWon],
+                ['📉 Games Lost', gamesLost],
+                ['🔄 Rounds Played', roundsPlayed],
+                ['✅ Rounds Won', roundsWon],
+                ['❌ Rounds Lost', roundsLost],
+                ['🥇 Golden Wins', goldenWins]
+            ];
+            stats.forEach(([label, value]) => {
+                const row = tbody.insertRow();
+                row.insertCell().textContent = label;
+                row.insertCell().textContent = value;
+            });
+            scoreTable.appendChild(tbody);
         },
 
         handleCloseStats() {
