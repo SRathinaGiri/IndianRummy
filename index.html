@@ -97,5 +97,14 @@
     <audio id="audio-click" src="click.mp3" preload="auto"></audio>    
     
     <script type="module" src="main-v2.js"></script>
+    <script>
+        if ('serviceWorker' in navigator) {
+            const swVersion = 'v1';
+            const basePath = window.location.pathname.split('/').slice(0, -1).join('/') + '/';
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register(`${basePath}sw.js?v=${swVersion}`);
+            });
+        }
+    </script>
 </body>
 </html>
