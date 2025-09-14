@@ -1,17 +1,19 @@
-const CACHE_NAME = 'rummy-game-cache-v3'; // Updated cache name to force a new install
-const urlsToCache = [
+const CACHE_VERSION = 'v1';
+const CACHE_NAME = `rummy-game-cache-${CACHE_VERSION}`;
+
+const APP_SHELL = [
   './',
   'index.html',
-  'how-to-play.html', // Added for offline access
+  'how-to-play.html',
   'style.css',
   'rummy-logic.js',
   'config.js',
   'ui.js',
-  'main-v2.js',      // Our renamed file
-  'drawing-v2.js',   // Our renamed file
+  'main-v2.js',
+  'drawing-v2.js',
   'cards.png',
   'joker.png',
-  'card-back.png',   // Your new card back image
+  'card-back.png',
   'icon-192x192.png',
   'icon-512x512.png',
   'shuffle.mp3',
@@ -24,44 +26,39 @@ const urlsToCache = [
   'click.mp3'
 ];
 
-// Install the service worker and cache all the game assets
 self.addEventListener('install', event => {
   event.waitUntil(
     caches.open(CACHE_NAME)
-      .then(cache => {
-        console.log('Opened cache and caching all assets');
-        return cache.addAll(urlsToCache);
-      })
-      .then(() => self.skipWaiting()) // Force the new service worker to activate
+      .then(cache => cache.addAll(APP_SHELL))
+      .then(() => self.skipWaiting())
   );
 });
 
-// Clean up old caches
 self.addEventListener('activate', event => {
   event.waitUntil(
-    caches.keys().then(cacheNames => {
-      return Promise.all(
-        cacheNames.filter(cacheName => {
-          return cacheName.startsWith('rummy-game-cache-') && cacheName !== CACHE_NAME;
-        }).map(cacheName => {
-          return caches.delete(cacheName);
-        })
-      );
-    })
+    caches.keys().then(keys => Promise.all(
+      keys.filter(key => key.startsWith('rummy-game-cache-') && key !== CACHE_NAME)
+          .map(key => caches.delete(key))
+    )).then(() => self.clients.claim())
   );
 });
 
-// Serve cached content when offline
 self.addEventListener('fetch', event => {
-  event.respondWith(
-    caches.match(event.request)
-      .then(response => {
-        // Cache hit - return response
-        if (response) {
+  const { request } = event;
+  if (request.mode === 'navigate' || (request.headers.get('accept') || '').includes('text/html')) {
+    event.respondWith(
+      fetch(request)
+        .then(response => {
+          const copy = response.clone();
+          caches.open(CACHE_NAME).then(cache => cache.put(request, copy));
           return response;
-        }
-        return fetch(event.request);
-      }
-    )
-  );
+        })
+        .catch(() => caches.match(request))
+    );
+  } else {
+    event.respondWith(
+      caches.match(request).then(resp => resp || fetch(request))
+    );
+  }
 });
+

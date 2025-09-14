@@ -46,16 +46,7 @@ document.addEventListener('DOMContentLoaded', () => {
             this.Elements = UI.initializeUI(this);
             this.canvas.addEventListener('click', (e) => this.handleCanvasClick(e));
 
-            // --- SERVICE WORKER RE-ENABLED ---
-            if ('serviceWorker' in navigator) {
-                window.addEventListener('load', () => {
-                    navigator.serviceWorker.register('sw.js').then(reg => {
-                        console.log('ServiceWorker registration successful.', reg);
-                    }, err => {
-                        console.log('ServiceWorker registration failed: ', err);
-                    });
-                });
-            }
+            // Service worker registration handled in index.html
         },
 
         loadAssets() {
