@@ -10,7 +10,10 @@ function calculateStats() {
     let gamesPlayed = 0,
         roundsPlayed = 0,
         gamesWon = 0,
-        roundsWon = 0;
+        roundsWon = 0,
+        goldenWins = 0,
+        playerPoints = 0,
+        otherPoints = 0;
 
     const rawHistory = localStorage.getItem('rummyGameHistory');
     if (rawHistory) {
@@ -22,9 +25,15 @@ function calculateStats() {
                 const wins = Array.isArray(game.wins) ? (game.wins[0] || 0) : 0;
                 roundsWon += wins;
                 if (Array.isArray(game.scores)) {
+                    const playerScore = game.scores[0] || 0;
+                    playerPoints += playerScore;
+                    otherPoints += game.scores.slice(1).reduce((a, b) => a + b, 0);
                     const lowest = Math.min(...game.scores);
-                    if (game.scores[0] === lowest) {
+                    if (playerScore === lowest) {
                         gamesWon += 1;
+                        if (playerScore === 0) {
+                            goldenWins += 1;
+                        }
                     }
                 }
             });
@@ -42,6 +51,10 @@ function calculateStats() {
             if (Array.isArray(data.wins)) {
                 roundsWon += data.wins[0] || 0;
             }
+            if (Array.isArray(data.scores)) {
+                playerPoints += data.scores[0] || 0;
+                otherPoints += data.scores.slice(1).reduce((a, b) => a + b, 0);
+            }
         } catch (e) {
             console.error('Failed to parse current game stats', e);
         }
@@ -49,7 +62,7 @@ function calculateStats() {
 
     const roundsLost = roundsPlayed - roundsWon;
     const gamesLost = gamesPlayed - gamesWon;
-    return { gamesPlayed, roundsPlayed, gamesWon, gamesLost, roundsWon, roundsLost };
+    return { gamesPlayed, roundsPlayed, gamesWon, gamesLost, roundsWon, roundsLost, goldenWins, playerPoints, otherPoints };
 }
 
 function updateScorecards(s) {
@@ -59,6 +72,9 @@ function updateScorecards(s) {
     document.getElementById('rounds-played').textContent = s.roundsPlayed;
     document.getElementById('rounds-won').textContent = s.roundsWon;
     document.getElementById('rounds-lost').textContent = s.roundsLost;
+    document.getElementById('golden-wins').textContent = s.goldenWins;
+    document.getElementById('player-points').textContent = s.playerPoints;
+    document.getElementById('other-points').textContent = s.otherPoints;
 }
 
 function drawCharts(stats) {
