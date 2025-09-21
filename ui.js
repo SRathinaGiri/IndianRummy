@@ -11,6 +11,8 @@ export function initializeUI(App) {
         startGameBtn: document.getElementById('start-game-btn'),
         showStatsBtn: document.getElementById('show-stats-btn'),
         nextRoundBtn: document.getElementById('next-round-btn'),
+        scoreboardNewGameBtn: document.getElementById('scoreboard-new-game-btn'),
+        scoreboardHomeBtn: document.getElementById('scoreboard-home-btn'),
         closeStatsBtn: document.getElementById('close-stats-btn'),
         continueToScoreboardBtn: document.getElementById('continue-to-scoreboard-btn'),
         scoreboardScreen: document.getElementById('scoreboard-screen'),
@@ -23,6 +25,8 @@ export function initializeUI(App) {
         window.location.href = 'dashboard.html';
     });
     Elements.nextRoundBtn.addEventListener('click', () => App.handleNextRound());
+    Elements.scoreboardNewGameBtn.addEventListener('click', () => App.handleScoreboardNewGame());
+    Elements.scoreboardHomeBtn.addEventListener('click', () => App.handleScoreboardHome());
     Elements.sortButton.addEventListener('click', () => App.handleSort());
     Elements.meldButton.addEventListener('click', () => App.handleMeld());
     Elements.discardButton.addEventListener('click', () => App.handleDiscard());

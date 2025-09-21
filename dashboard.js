@@ -4,6 +4,23 @@ document.addEventListener('DOMContentLoaded', () => {
     const stats = calculateStats();
     updateScorecards(stats);
     drawCharts(stats);
+
+    const homeBtn = document.getElementById('dashboard-home-btn');
+    const newGameBtn = document.getElementById('dashboard-new-game-btn');
+
+    if (homeBtn) {
+        homeBtn.addEventListener('click', () => {
+            localStorage.removeItem('rummyAutoStart');
+            window.location.href = 'index.html';
+        });
+    }
+
+    if (newGameBtn) {
+        newGameBtn.addEventListener('click', () => {
+            localStorage.setItem('rummyAutoStart', 'true');
+            window.location.href = 'index.html';
+        });
+    }
 });
 
 function calculateStats() {
