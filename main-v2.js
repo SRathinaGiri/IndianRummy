@@ -20,6 +20,10 @@ document.addEventListener('DOMContentLoaded', () => {
         fastMode: false,
         pendingAiDeclaration: null,
         winLosses: [],
+        lastSettings: null,
+        autoStartRequested: false,
+        pendingAutoStartSettings: null,
+        hasArchivedCurrentGame: false,
 
         // --- DOM Elements & Context ---
         canvas: document.getElementById('gameCanvas'),
@@ -44,6 +48,8 @@ document.addEventListener('DOMContentLoaded', () => {
             this.ctx = this.canvas.getContext('2d');
             this.loadAssets();
             this.Elements = UI.initializeUI(this);
+            this.loadPersistedSettings();
+            this.maybeTriggerAutoStart();
             this.canvas.addEventListener('click', (e) => this.handleCanvasClick(e));
 
             // Service worker registration handled in index.html
@@ -62,6 +68,96 @@ document.addEventListener('DOMContentLoaded', () => {
             soundIds.forEach(id => {
                 this.assets.sounds[id] = document.getElementById(`audio-${id}`);
             });
+        },
+
+        normalizeSettings(raw = {}) {
+            const safe = raw || {};
+            const clampNumber = (value, fallback, min, max) => {
+                const parsed = parseInt(value, 10);
+                if (Number.isFinite(parsed)) {
+                    if (typeof min === 'number') {
+                        const lower = Math.max(parsed, min);
+                        return typeof max === 'number' ? Math.min(lower, max) : lower;
+                    }
+                    return typeof max === 'number' ? Math.min(parsed, max) : parsed;
+                }
+                return fallback;
+            };
+            return {
+                numPlayers: clampNumber(safe.numPlayers, 1, 1, 3),
+                numRounds: clampNumber(safe.numRounds, 3, 1),
+                hiddenJoker: safe.hiddenJoker !== undefined ? !!safe.hiddenJoker : true,
+                debugMode: !!safe.debugMode,
+                fastMode: safe.fastMode !== undefined ? !!safe.fastMode : true
+            };
+        },
+
+        getSettingsFromDom() {
+            return this.normalizeSettings({
+                numPlayers: document.getElementById('num-players').value,
+                numRounds: document.getElementById('num-rounds').value,
+                hiddenJoker: document.getElementById('hidden-joker').checked,
+                debugMode: document.getElementById('debug-mode').checked,
+                fastMode: document.getElementById('fast-mode').checked
+            });
+        },
+
+        applySettingsToDom(settings) {
+            if (!settings) return;
+            const normalized = this.normalizeSettings(settings);
+            const numPlayersSelect = document.getElementById('num-players');
+            const numRoundsSelect = document.getElementById('num-rounds');
+            if (numPlayersSelect) numPlayersSelect.value = String(normalized.numPlayers);
+            if (numRoundsSelect) numRoundsSelect.value = String(normalized.numRounds);
+            const hiddenJokerCheckbox = document.getElementById('hidden-joker');
+            const debugModeCheckbox = document.getElementById('debug-mode');
+            const fastModeCheckbox = document.getElementById('fast-mode');
+            if (hiddenJokerCheckbox) hiddenJokerCheckbox.checked = !!normalized.hiddenJoker;
+            if (debugModeCheckbox) debugModeCheckbox.checked = !!normalized.debugMode;
+            if (fastModeCheckbox) fastModeCheckbox.checked = !!normalized.fastMode;
+        },
+
+        loadPersistedSettings() {
+            let storedSettings = null;
+            const raw = localStorage.getItem('rummyLastSettings');
+            if (raw) {
+                try {
+                    storedSettings = this.normalizeSettings(JSON.parse(raw));
+                } catch (e) {
+                    console.error('Failed to parse saved settings', e);
+                }
+            }
+            if (!storedSettings) {
+                storedSettings = this.getSettingsFromDom();
+            } else {
+                this.applySettingsToDom(storedSettings);
+            }
+            this.lastSettings = storedSettings;
+        },
+
+        maybeTriggerAutoStart() {
+            const autoStart = localStorage.getItem('rummyAutoStart');
+            if (autoStart === 'true') {
+                localStorage.removeItem('rummyAutoStart');
+                this.requestAutoStart(this.lastSettings);
+            }
+        },
+
+        requestAutoStart(settings) {
+            this.autoStartRequested = true;
+            this.pendingAutoStartSettings = this.normalizeSettings(settings || this.lastSettings || this.getSettingsFromDom());
+            const attemptStart = () => {
+                if (!this.autoStartRequested) return;
+                if (this.assets.cardSpritesheet.complete && this.assets.cardSpritesheet.naturalHeight !== 0) {
+                    this.autoStartRequested = false;
+                    const pending = this.pendingAutoStartSettings;
+                    this.pendingAutoStartSettings = null;
+                    this.startGame(pending);
+                } else {
+                    setTimeout(attemptStart, 150);
+                }
+            };
+            attemptStart();
         },
 
         playSound(name) {
@@ -143,21 +239,24 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // --- Main Game Flow & Actions ---
         
-        startGame() {
+        startGame(customSettings = null) {
             if (!this.assets.cardSpritesheet.complete || this.assets.cardSpritesheet.naturalHeight === 0) {
                 alert("Card images have not finished loading yet. Please wait a moment.");
                 return;
             }
 
-            const settings = {
-                numPlayers: document.getElementById('num-players').value,
-                numRounds: document.getElementById('num-rounds').value,
-                hiddenJoker: document.getElementById('hidden-joker').checked,
-                debugMode: document.getElementById('debug-mode').checked,
-                fastMode: document.getElementById('fast-mode').checked
-            };
+            this.autoStartRequested = false;
+            this.pendingAutoStartSettings = null;
+
+            const settings = this.normalizeSettings(customSettings || this.getSettingsFromDom());
+            this.applySettingsToDom(settings);
+            this.lastSettings = { ...settings };
+            localStorage.setItem('rummyLastSettings', JSON.stringify(this.lastSettings));
+
             this.fastMode = settings.fastMode;
             this.playSound('shuffle');
+
+            this.resetStateForNewGame();
 
             this.Elements.settingsScreen.style.display = 'none';
             this.Elements.scoreboardScreen.style.display = 'none';
@@ -166,14 +265,16 @@ document.addEventListener('DOMContentLoaded', () => {
             this.Elements.debugArea.style.display = settings.debugMode ? 'block' : 'none';
 
             this.pendingAiDeclaration = null;
+            this.hasArchivedCurrentGame = false;
 
             const playerNames = ['You'];
-            for (let i = 0; i < parseInt(settings.numPlayers, 10); i++) {
+            for (let i = 0; i < settings.numPlayers; i++) {
                 playerNames.push(`Computer ${i + 1}`);
             }
-           
+
             this.game = new RummyGameLogic(playerNames, settings);
             this.humanPlayer = this.game.players[0];
+            this.winLosses = new Array(this.game.players.length).fill(0);
 
             const hasHistory = this.loadScoreHistory();
 
@@ -184,6 +285,24 @@ document.addEventListener('DOMContentLoaded', () => {
             } else {
                 this.animateInitialDeal();
             }
+        },
+
+        resetStateForNewGame() {
+            if (this.messageTimer) {
+                clearTimeout(this.messageTimer);
+                this.messageTimer = null;
+            }
+            this.game = null;
+            this.humanPlayer = null;
+            this.isAnimating = false;
+            this.isDiscarding = false;
+            this.animatedCards = [];
+            this.ungroupButtonRects = [];
+            this.pickedFromDiscardThisTurn = null;
+            this.declarationResult = null;
+            this.nextAction = null;
+            this.pendingAiDeclaration = null;
+            this.jokerFlipState = { animating: false, phase: 1, currentWidth: 0 };
         },
 
         async animateInitialDeal() {
@@ -650,30 +769,52 @@ document.addEventListener('DOMContentLoaded', () => {
         },
 
         handleNextRound() {
+            if (this.game && this.game.currentRound >= this.game.settings.numRounds) {
+                this.handleScoreboardNewGame();
+                return;
+            }
+
             this.playSound('click');
             this.Elements.scoreboardScreen.style.display = 'none';
 
             this.pendingAiDeclaration = null;
-
-            // --- THIS IS THE FIX ---
-            // We now reset the joker flip animation state for the new round.
             this.jokerFlipState = { animating: false, phase: 1, currentWidth: 0 };
-            // -------------------------
 
+            this.playSound('shuffle');
+            this.Elements.gameContainer.style.display = 'block';
+            this.Elements.debugArea.style.display = this.game.settings.debugMode ? 'block' : 'none';
+            this.game.startNextRound();
+            this.animateInitialDeal();
+        },
+
+        finalizeCompletedGame() {
+            if (!this.game || this.hasArchivedCurrentGame) return;
             if (this.game.currentRound >= this.game.settings.numRounds) {
-                // Archive completed game and reset current game data
                 this.archiveScoreHistory();
                 localStorage.removeItem('rummyScoreHistory');
                 this.winLosses = [];
-                this.game = null;
-                this.Elements.settingsScreen.style.display = 'block';
-            } else {
-                this.playSound('shuffle');
-                this.Elements.gameContainer.style.display = 'block';
-                this.Elements.debugArea.style.display = this.game.settings.debugMode ? 'block' : 'none';
-                this.game.startNextRound();
-                this.animateInitialDeal();
+                this.hasArchivedCurrentGame = true;
             }
+        },
+
+        handleScoreboardNewGame() {
+            this.playSound('click');
+            this.Elements.scoreboardScreen.style.display = 'none';
+            this.finalizeCompletedGame();
+            const settings = this.lastSettings ? { ...this.lastSettings } : this.getSettingsFromDom();
+            this.startGame(settings);
+        },
+
+        handleScoreboardHome() {
+            this.playSound('click');
+            this.Elements.scoreboardScreen.style.display = 'none';
+            this.finalizeCompletedGame();
+            this.resetStateForNewGame();
+            this.Elements.gameContainer.style.display = 'none';
+            this.Elements.debugArea.style.display = 'none';
+            this.Elements.showdownScreen.style.display = 'none';
+            this.Elements.settingsScreen.style.display = 'block';
+            this.applySettingsToDom(this.lastSettings || this.getSettingsFromDom());
         },
 
         handleContinueToScoreboard() {
@@ -688,23 +829,35 @@ document.addEventListener('DOMContentLoaded', () => {
             const gameWinnerText = document.getElementById('game-winner-text');
             const nextRoundBtn = document.getElementById('next-round-btn');
             const closeStatsBtn = document.getElementById('close-stats-btn');
+            const newGameBtn = this.Elements.scoreboardNewGameBtn;
+            const homeBtn = this.Elements.scoreboardHomeBtn;
             this.Elements.scoreboardScreen.style.display = 'block';
             gameWinnerText.textContent = '';
 
             nextRoundBtn.style.display = 'inline-block';
             closeStatsBtn.style.display = 'none';
+            if (newGameBtn) newGameBtn.style.display = 'none';
+            if (homeBtn) homeBtn.style.display = 'none';
+
+            const isGameComplete = this.game && this.game.currentRound >= this.game.settings.numRounds;
 
             if (!initial && this.declarationResult) {
                 if (this.declarationResult.penaltyPlayer) {
-                    roundWinnerText.textContent = `${this.declarationResult.penaltyPlayer.name} made a wrong declaration!`;
+                    const message = `${this.declarationResult.penaltyPlayer.name} made a wrong declaration!`;
+                    roundWinnerText.textContent = isGameComplete ? `Game Complete! ${message}` : message;
                 } else {
-                    roundWinnerText.textContent = `${this.declarationResult.winnerName} won Round ${this.game.currentRound}!`;
+                    const message = `${this.declarationResult.winnerName} won Round ${this.game.currentRound}!`;
+                    roundWinnerText.textContent = isGameComplete
+                        ? `Game Complete! ${this.declarationResult.winnerName} won the final round.`
+                        : message;
                     const winnerIndex = this.game.players.findIndex(p => p.name === this.declarationResult.winnerName);
                     if (winnerIndex >= 0) {
                         this.winLosses[winnerIndex] = (this.winLosses[winnerIndex] || 0) + 1;
                     }
                 }
                 this.saveScoreHistory();
+            } else if (isGameComplete) {
+                roundWinnerText.textContent = 'Game Complete! Final standings below.';
             } else {
                 roundWinnerText.textContent = `Current standings after Round ${this.game.currentRound}`;
             }
@@ -719,7 +872,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 row.insertCell().textContent = this.game.currentRound - this.winLosses[index];
             });
             scoreTable.appendChild(tbody);
-            if (this.game.currentRound >= this.game.settings.numRounds) {
+            if (isGameComplete) {
                 const lowest = Math.min(...this.game.scores);
                 const winnerIndex = this.game.scores.indexOf(lowest);
                 const winnerName = this.game.players[winnerIndex].name;
@@ -727,7 +880,9 @@ document.addEventListener('DOMContentLoaded', () => {
                     winnerIndex === 0
                         ? `Congratulations! You win the game with ${lowest} points!`
                         : `${winnerName} wins the game with ${lowest} points!`;
-                nextRoundBtn.textContent = 'New Game';
+                nextRoundBtn.style.display = 'none';
+                if (newGameBtn) newGameBtn.style.display = 'inline-block';
+                if (homeBtn) homeBtn.style.display = 'inline-block';
             } else {
                 nextRoundBtn.textContent = 'Next Round';
             }
@@ -755,6 +910,8 @@ document.addEventListener('DOMContentLoaded', () => {
             this.Elements.gameContainer.style.display = 'none';
             this.Elements.scoreboardScreen.style.display = 'block';
             nextRoundBtn.style.display = 'none';
+            if (this.Elements.scoreboardNewGameBtn) this.Elements.scoreboardNewGameBtn.style.display = 'none';
+            if (this.Elements.scoreboardHomeBtn) this.Elements.scoreboardHomeBtn.style.display = 'none';
             closeStatsBtn.style.display = 'inline-block';
             gameWinnerText.textContent = '';
 
@@ -828,7 +985,10 @@ document.addEventListener('DOMContentLoaded', () => {
             this.Elements.scoreboardScreen.style.display = 'none';
             this.Elements.closeStatsBtn.style.display = 'none';
             this.Elements.nextRoundBtn.style.display = 'block';
+            if (this.Elements.scoreboardNewGameBtn) this.Elements.scoreboardNewGameBtn.style.display = 'none';
+            if (this.Elements.scoreboardHomeBtn) this.Elements.scoreboardHomeBtn.style.display = 'none';
             this.Elements.settingsScreen.style.display = 'block';
+            this.applySettingsToDom(this.lastSettings || this.getSettingsFromDom());
         },
 
 

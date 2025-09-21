@@ -45,7 +45,7 @@
         </div>
         <div class="setting-item">
             <label for="fast-mode">Fast Mode (No Animations/Sound):</label>
-            <input type="checkbox" id="fast-mode">
+            <input type="checkbox" id="fast-mode" checked>
         </div>
         <a href="how-to-play.html" style="color: #FFD700; margin-top: 15px; display: inline-block;">How to Play</a>
         <br>
@@ -64,8 +64,12 @@
         <h2 id="game-winner-text" style="margin-top:10px;"></h2>
         <h3>Scoreboard</h3>
         <table id="score-table"></table>
-        <button id="next-round-btn">Next Round</button>
-        <button id="close-stats-btn" style="display: none;">Close</button>
+        <div class="scoreboard-actions">
+            <button id="next-round-btn">Next Round</button>
+            <button id="scoreboard-new-game-btn" style="display: none;">New Game</button>
+            <button id="scoreboard-home-btn" style="display: none;">Back to Home</button>
+            <button id="close-stats-btn" style="display: none;">Close</button>
+        </div>
     </div>
     
     <div id="showdown-screen" style="display: none;">
