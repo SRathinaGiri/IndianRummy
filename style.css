@@ -95,6 +95,8 @@ button:hover {
     color: white;
     width: 80%;
     max-width: 900px;
+    position: relative;
+    overflow: hidden;
 }
 
 #scoreboard-screen h2, #showdown-screen h2 {
@@ -134,6 +136,63 @@ button:hover {
 }
 #next-round-btn:hover, #continue-to-scoreboard-btn:hover, #scoreboard-new-game-btn:hover, #scoreboard-home-btn:hover {
     background-color: #E03030;
+}
+
+#scoreboard-screen.game-complete {
+    animation: scoreboard-celebrate 0.8s ease-out;
+    box-shadow: 0 0 25px rgba(255, 215, 0, 0.7);
+}
+
+#scoreboard-screen.game-complete::before,
+#scoreboard-screen.game-complete::after {
+    content: '';
+    position: absolute;
+    inset: -40px 0 -20px 0;
+    background-image:
+        radial-gradient(circle, rgba(255, 215, 0, 0.85) 0 6px, transparent 7px),
+        radial-gradient(circle, rgba(135, 206, 250, 0.75) 0 5px, transparent 6px),
+        radial-gradient(circle, rgba(255, 99, 132, 0.75) 0 5px, transparent 6px),
+        radial-gradient(circle, rgba(144, 238, 144, 0.75) 0 5px, transparent 6px);
+    background-size: 160px 160px;
+    animation: confetti-fall 2.6s linear infinite;
+    pointer-events: none;
+    opacity: 0.75;
+}
+
+#scoreboard-screen.game-complete::after {
+    animation-delay: 1.3s;
+    background-size: 140px 140px;
+    opacity: 0.5;
+    filter: hue-rotate(60deg);
+}
+
+@keyframes scoreboard-celebrate {
+    0% {
+        transform: scale(0.95);
+        box-shadow: 0 0 0 rgba(255, 215, 0, 0);
+    }
+    60% {
+        transform: scale(1.03);
+        box-shadow: 0 0 35px rgba(255, 215, 0, 0.85);
+    }
+    100% {
+        transform: scale(1);
+        box-shadow: 0 0 18px rgba(255, 215, 0, 0.5);
+    }
+}
+
+@keyframes confetti-fall {
+    0% {
+        transform: translateY(-40px) rotate(0deg);
+        opacity: 0;
+    }
+    15% {
+        opacity: 0.9;
+    }
+    100% {
+        transform: translateY(120px) rotate(1turn);
+        opacity: 0;
+    }
 }
 
 button:disabled {

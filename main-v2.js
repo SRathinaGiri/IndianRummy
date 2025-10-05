@@ -292,6 +292,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 clearTimeout(this.messageTimer);
                 this.messageTimer = null;
             }
+            if (this.Elements.scoreboardScreen) {
+                this.Elements.scoreboardScreen.classList.remove('game-complete');
+            }
             this.game = null;
             this.humanPlayer = null;
             this.isAnimating = false;
@@ -800,6 +803,9 @@ document.addEventListener('DOMContentLoaded', () => {
         handleScoreboardNewGame() {
             this.playSound('click');
             this.Elements.scoreboardScreen.style.display = 'none';
+            if (this.Elements.scoreboardScreen) {
+                this.Elements.scoreboardScreen.classList.remove('game-complete');
+            }
             this.finalizeCompletedGame();
             const settings = this.lastSettings ? { ...this.lastSettings } : this.getSettingsFromDom();
             this.startGame(settings);
@@ -808,6 +814,9 @@ document.addEventListener('DOMContentLoaded', () => {
         handleScoreboardHome() {
             this.playSound('click');
             this.Elements.scoreboardScreen.style.display = 'none';
+            if (this.Elements.scoreboardScreen) {
+                this.Elements.scoreboardScreen.classList.remove('game-complete');
+            }
             this.finalizeCompletedGame();
             this.resetStateForNewGame();
             this.Elements.gameContainer.style.display = 'none';
@@ -831,6 +840,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const closeStatsBtn = document.getElementById('close-stats-btn');
             const newGameBtn = this.Elements.scoreboardNewGameBtn;
             const homeBtn = this.Elements.scoreboardHomeBtn;
+            const scoreboardScreen = this.Elements.scoreboardScreen;
             this.Elements.scoreboardScreen.style.display = 'block';
             gameWinnerText.textContent = '';
 
@@ -840,15 +850,18 @@ document.addEventListener('DOMContentLoaded', () => {
             if (homeBtn) homeBtn.style.display = 'none';
 
             const isGameComplete = this.game && this.game.currentRound >= this.game.settings.numRounds;
+            if (scoreboardScreen) {
+                scoreboardScreen.classList.toggle('game-complete', !!isGameComplete);
+            }
 
             if (!initial && this.declarationResult) {
                 if (this.declarationResult.penaltyPlayer) {
                     const message = `${this.declarationResult.penaltyPlayer.name} made a wrong declaration!`;
-                    roundWinnerText.textContent = isGameComplete ? `Game Complete! ${message}` : message;
+                    roundWinnerText.textContent = isGameComplete ? `🎉 Game Complete! ${message}` : message;
                 } else {
                     const message = `${this.declarationResult.winnerName} won Round ${this.game.currentRound}!`;
                     roundWinnerText.textContent = isGameComplete
-                        ? `Game Complete! ${this.declarationResult.winnerName} won the final round.`
+                        ? `🎉 Game Complete! ${this.declarationResult.winnerName} won the final round.`
                         : message;
                     const winnerIndex = this.game.players.findIndex(p => p.name === this.declarationResult.winnerName);
                     if (winnerIndex >= 0) {
@@ -857,7 +870,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
                 this.saveScoreHistory();
             } else if (isGameComplete) {
-                roundWinnerText.textContent = 'Game Complete! Final standings below.';
+                roundWinnerText.textContent = '🎉 Game Complete! Final standings below.';
             } else {
                 roundWinnerText.textContent = `Current standings after Round ${this.game.currentRound}`;
             }
@@ -878,8 +891,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 const winnerName = this.game.players[winnerIndex].name;
                 gameWinnerText.textContent =
                     winnerIndex === 0
-                        ? `Congratulations! You win the game with ${lowest} points!`
-                        : `${winnerName} wins the game with ${lowest} points!`;
+                        ? `🏆 Congratulations! You win the game with ${lowest} points!`
+                        : `🏆 ${winnerName} wins the game with ${lowest} points!`;
                 nextRoundBtn.style.display = 'none';
                 if (newGameBtn) newGameBtn.style.display = 'inline-block';
                 if (homeBtn) homeBtn.style.display = 'inline-block';
@@ -914,6 +927,9 @@ document.addEventListener('DOMContentLoaded', () => {
             if (this.Elements.scoreboardHomeBtn) this.Elements.scoreboardHomeBtn.style.display = 'none';
             closeStatsBtn.style.display = 'inline-block';
             gameWinnerText.textContent = '';
+            if (this.Elements.scoreboardScreen) {
+                this.Elements.scoreboardScreen.classList.remove('game-complete');
+            }
 
             // --- Aggregate statistics for the human player only ---
             let gamesPlayed = 0;
@@ -989,6 +1005,9 @@ document.addEventListener('DOMContentLoaded', () => {
             if (this.Elements.scoreboardHomeBtn) this.Elements.scoreboardHomeBtn.style.display = 'none';
             this.Elements.settingsScreen.style.display = 'block';
             this.applySettingsToDom(this.lastSettings || this.getSettingsFromDom());
+            if (this.Elements.scoreboardScreen) {
+                this.Elements.scoreboardScreen.classList.remove('game-complete');
+            }
         },
 
 
