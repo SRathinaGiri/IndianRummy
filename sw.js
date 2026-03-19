@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'v1';
+const CACHE_VERSION = 'v2';
 const CACHE_NAME = `rummy-game-cache-${CACHE_VERSION}`;
 
 const APP_SHELL = [
@@ -16,6 +16,9 @@ const APP_SHELL = [
   'card-back.png',
   'icon-192x192.png',
   'icon-512x512.png',
+  'manifest.json',
+  'dashboard.html',
+  'dashboard.js',
   'shuffle.mp3',
   'draw.mp3',
   'discard.mp3',
