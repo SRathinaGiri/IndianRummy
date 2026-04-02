@@ -379,6 +379,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 if (turnResult.declared) {
                     this.playSound('declare');
+
+                    if (this.game.settings.hiddenJoker && !this.humanPlayer.hasSeenJoker) {
+                        this.jokerFlipState.animating = true;
+                        this.humanPlayer.canRevealJoker = true;
+                        this.humanPlayer.hasSeenJoker = true;
+                        await this.sleep(1000); // Wait for the animation to finish
+                    }
+
                     this.setMessage(`${currentPlayer.name} has declared! Arrange your cards and press Show.`);
                     await this.sleep(1000);
                     this.pendingAiDeclaration = {
