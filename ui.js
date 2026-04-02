@@ -20,7 +20,26 @@ export function initializeUI(App) {
         debugArea: document.getElementById('debug-area'),
     };
 
-    Elements.startGameBtn.addEventListener('click', () => App.startGame());
+    Elements.startGameBtn.addEventListener('click', () => {
+        Elements.startGameBtn.disabled = true;
+        Elements.startGameBtn.textContent = 'Starting...';
+
+        // Wait for image if needed, else start immediately
+        if (!App.assets.cardSpritesheet.complete || App.assets.cardSpritesheet.naturalHeight === 0) {
+            const checkLoad = setInterval(() => {
+                if (App.assets.cardSpritesheet.complete && App.assets.cardSpritesheet.naturalHeight !== 0) {
+                    clearInterval(checkLoad);
+                    Elements.startGameBtn.disabled = false;
+                    Elements.startGameBtn.textContent = 'Start Game';
+                    App.startGame();
+                }
+            }, 100);
+        } else {
+            Elements.startGameBtn.disabled = false;
+            Elements.startGameBtn.textContent = 'Start Game';
+            App.startGame();
+        }
+    });
     Elements.showStatsBtn.addEventListener('click', () => {
         window.location.href = 'dashboard.html';
     });

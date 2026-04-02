@@ -240,11 +240,6 @@ document.addEventListener('DOMContentLoaded', () => {
         // --- Main Game Flow & Actions ---
         
         startGame(customSettings = null) {
-            if (!this.assets.cardSpritesheet.complete || this.assets.cardSpritesheet.naturalHeight === 0) {
-                alert("Card images have not finished loading yet. Please wait a moment.");
-                return;
-            }
-
             this.autoStartRequested = false;
             this.pendingAutoStartSettings = null;
 
