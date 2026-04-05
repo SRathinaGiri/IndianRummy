@@ -500,19 +500,32 @@ export class RummyGameLogic {
         });
 
         const canMeldSets = runCount >= 2 && pureRunCount >= 1;
-        playerObj.melds.forEach(meld => {
-            const isRun = this._validateRun(meld, playerObj);
-            const isSet = this._validateSet(meld, playerObj);
-            if (!isRun && !(isSet && canMeldSets)) {
+
+        // If pure sequence is not produced, all cards (except jokers) must be counted
+        if (pureRunCount < 1) {
+            playerObj.melds.forEach(meld => {
                 meld.forEach(card => {
                     if (!this.isJoker(card, playerObj)) {
                         totalPoints += card.getPoints();
                     }
                 });
-            }
-        });
+            });
+        } else {
+            playerObj.melds.forEach(meld => {
+                const isRun = this._validateRun(meld, playerObj);
+                const isSet = this._validateSet(meld, playerObj);
+                if (!isRun && !(isSet && canMeldSets)) {
+                    meld.forEach(card => {
+                        if (!this.isJoker(card, playerObj)) {
+                            totalPoints += card.getPoints();
+                        }
+                    });
+                }
+            });
+        }
 
-        return totalPoints;
+        // Cap at 80 points
+        return Math.min(totalPoints, 80);
     }
 
 // rummy-logic.js - PART 6 of 7
