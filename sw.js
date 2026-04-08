@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'v2';
+const CACHE_VERSION = 'v3';
 const CACHE_NAME = `rummy-game-cache-${CACHE_VERSION}`;
 
 const APP_SHELL = [
@@ -56,11 +56,20 @@ self.addEventListener('fetch', event => {
           caches.open(CACHE_NAME).then(cache => cache.put(request, copy));
           return response;
         })
-        .catch(() => caches.match(request))
+        .catch(() => caches.match(request, { ignoreSearch: true }))
     );
   } else {
     event.respondWith(
-      caches.match(request).then(resp => resp || fetch(request))
+      caches.match(request, { ignoreSearch: true }).then(resp => {
+        return resp || fetch(request).then(response => {
+          const copy = response.clone();
+          caches.open(CACHE_NAME).then(cache => cache.put(request, copy));
+          return response;
+        });
+      }).catch(() => {
+        // If both cache and network fail offline, return a matching cache if possible
+        return caches.match(request, { ignoreSearch: true });
+      })
     );
   }
 });

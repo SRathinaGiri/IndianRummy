@@ -122,7 +122,7 @@
     <script type="module" src="main-v2.js"></script>
     <script>
         if ('serviceWorker' in navigator) {
-            const swVersion = 'v2';
+            const swVersion = 'v3';
             const basePath = window.location.pathname.split('/').slice(0, -1).join('/') + '/';
             window.addEventListener('load', () => {
                 navigator.serviceWorker.register(`${basePath}sw.js?v=${swVersion}`);
