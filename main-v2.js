@@ -622,7 +622,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
 
-            const mouse = { x: event.clientX - this.canvas.getBoundingClientRect().left, y: event.clientY - this.canvas.getBoundingClientRect().top };
+            const canvasRect = this.canvas.getBoundingClientRect();
+            const mouse = {
+                x: (event.clientX - canvasRect.left) * (this.canvas.width / canvasRect.width),
+                y: (event.clientY - canvasRect.top) * (this.canvas.height / canvasRect.height)
+            };
             
             if (this.game.turn_state === 'DRAW') {
                 const stockPileRect = { x: 250, y: 40, width: C.CARD_WIDTH, height: C.CARD_HEIGHT };

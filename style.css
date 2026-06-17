@@ -285,3 +285,29 @@ button:disabled {
 .card-text-black {
     color: #000000;
 }
+
+@media (min-width: 1024px) {
+    #game-container {
+        width: min(96vw, 1200px);
+    }
+
+    canvas {
+        width: min(96vw, 1200px);
+        height: auto;
+        box-sizing: border-box;
+    }
+
+    #debug-area {
+        width: min(96vw, 1200px);
+    }
+
+    .controls {
+        gap: 16px;
+        flex-wrap: wrap;
+    }
+
+    button {
+        font-size: 18px;
+        padding: 10px 20px;
+    }
+}
