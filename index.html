@@ -53,6 +53,14 @@
             </select>
         </div>
         <div class="setting-item">
+            <label for="ai-difficulty">AI Difficulty:</label>
+            <select id="ai-difficulty">
+                <option value="easy">Easy</option>
+                <option value="medium">Medium</option>
+                <option value="hard" selected>Hard</option>
+            </select>
+        </div>
+        <div class="setting-item">
             <label for="hidden-joker">Hidden Joker Rule:</label>
             <input type="checkbox" id="hidden-joker" checked>
         </div>
@@ -122,7 +130,7 @@
     <script type="module" src="main-v2.js"></script>
     <script>
         if ('serviceWorker' in navigator) {
-            const swVersion = 'v4';
+            const swVersion = 'v5';
             const basePath = window.location.pathname.split('/').slice(0, -1).join('/') + '/';
             window.addEventListener('load', () => {
                 navigator.serviceWorker.register(`${basePath}sw.js?v=${swVersion}`);

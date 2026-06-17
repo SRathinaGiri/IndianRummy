@@ -302,30 +302,208 @@ export class RummyGameLogic {
     }
 
 // rummy-logic.js - PART 4 of 7
-    
-    _evaluateHandPotential(hand, player) {
+
+    _aiDifficulty() {
+        return this.settings.aiDifficulty || 'hard';
+    }
+
+    _rankIndex(rank) {
+        if (rank === 'A') return 1;
+        if (rank === 'J') return 11;
+        if (rank === 'Q') return 12;
+        if (rank === 'K') return 13;
+        return parseInt(rank, 10);
+    }
+
+    _rankDistance(rankA, rankB) {
+        const a = this._rankIndex(rankA);
+        const b = this._rankIndex(rankB);
+        if (!Number.isFinite(a) || !Number.isFinite(b)) return Infinity;
+        const lowDistance = Math.abs(a - b);
+        const highA = rankA === 'A' ? 14 : a;
+        const highB = rankB === 'A' ? 14 : b;
+        return Math.min(lowDistance, Math.abs(highA - highB));
+    }
+
+    _countDiscardedRank(rank) {
+        return this.discard_history.filter(card => card.rank === rank).length;
+    }
+
+    _getPotentialDetails(hand, player) {
         const tempPlayer = new Player('dummy', true);
         tempPlayer.hand = [...hand];
         tempPlayer.hasSeenJoker = player.hasSeenJoker;
         this.autoMeld(tempPlayer);
-        let score = tempPlayer.hand.reduce((s, c) => s + c.getPoints(), 0);
-        // Penalize holding high value cards when similar ranks were already discarded
-        for (const c of tempPlayer.hand) {
+
+        const runCount = tempPlayer.melds.filter(meld => this._validateRun(meld, tempPlayer)).length;
+        const pureRunCount = tempPlayer.melds.filter(meld => this.isPureSequence(meld, tempPlayer)).length;
+        const deadwoodPoints = tempPlayer.hand.reduce((sum, card) => {
+            return sum + (this.isJoker(card, tempPlayer) ? 0 : card.getPoints());
+        }, 0);
+        const validation = this.validateDeclaration(tempPlayer);
+
+        return {
+            deadwood: tempPlayer.hand,
+            melds: tempPlayer.melds,
+            runCount,
+            pureRunCount,
+            deadwoodPoints,
+            isValidDeclaration: validation.isValid
+        };
+    }
+
+    _scoreNearMeldCards(deadwood, allCards, player) {
+        let bonus = 0;
+        const nonJokers = allCards.filter(card => !this.isJoker(card, player) && card.rank !== 'JOKER');
+
+        for (const card of deadwood) {
+            if (this.isJoker(card, player)) {
+                bonus += 14;
+                continue;
+            }
+
+            const sameRank = nonJokers.filter(other => other !== card && other.rank === card.rank && other.suit !== card.suit).length;
+            if (sameRank >= 2) bonus += 9;
+            else if (sameRank === 1) bonus += 4;
+
+            const suitedCards = nonJokers.filter(other => other !== card && other.suit === card.suit);
+            if (suitedCards.some(other => this._rankDistance(other.rank, card.rank) === 1)) bonus += 5;
+            if (suitedCards.some(other => this._rankDistance(other.rank, card.rank) === 2)) bonus += 2;
+
+            const discardedRankCount = this._countDiscardedRank(card.rank);
+            if (discardedRankCount >= 2) bonus -= 3;
+        }
+
+        return bonus;
+    }
+
+    _evaluateHandPotential(hand, player) {
+        const details = this._getPotentialDetails(hand, player);
+        let score = details.deadwoodPoints;
+
+        for (const c of details.deadwood) {
             if (c.getPoints() >= 10 && this.discard_history.some(d => d.rank === c.rank)) {
-                score += 5; // increase potential score to discourage waiting
+                score += 5;
             }
         }
-        if (tempPlayer.melds.length > 0) {
-             const validation = this.validateDeclaration(tempPlayer);
-             if (validation.isValid) {
-                 score -= 100;
-             } else {
-                 score -= tempPlayer.melds.length * 10;
-             }
+
+        if (details.isValidDeclaration) {
+            score -= 120;
+        } else {
+            score -= details.melds.length * 10;
+            score -= details.pureRunCount * 12;
+            if (details.runCount >= 2) score -= 8;
         }
+
+        score -= this._scoreNearMeldCards(details.deadwood, hand, player);
         return score;
     }
-    
+
+    _canCardCompleteMeld(card, hand, player, pureOnly = false) {
+        const others = hand.filter(c => c !== card);
+        const combinations = (arr, k) => {
+            if (k > arr.length || k <= 0) return [];
+            if (k === 1) return arr.map(item => [item]);
+            const result = [];
+            arr.forEach((item, index) => {
+                for (const tail of combinations(arr.slice(index + 1), k - 1)) {
+                    result.push([item, ...tail]);
+                }
+            });
+            return result;
+        };
+
+        for (let size = 2; size <= 5; size++) {
+            for (const combo of combinations(others, size)) {
+                const meld = [card, ...combo];
+                if (pureOnly && this.isPureSequence(meld, player)) return true;
+                if (!pureOnly && (this._validateRun(meld, player) || this._validateSet(meld, player))) return true;
+            }
+        }
+        return false;
+    }
+
+    _scoreDiscardPickup(card, player) {
+        if (!card) return -Infinity;
+        if (this.isJoker(card, player)) return 100;
+
+        const hand = [...player.hand, ...player.melds.flat()];
+        const currentScore = this._evaluateHandPotential(hand, player);
+        const scoreWithCard = this._evaluateHandPotential([...hand, card], player);
+        let pickupScore = currentScore - scoreWithCard;
+
+        if (this._canCardCompleteMeld(card, [...hand, card], player, true)) pickupScore += 18;
+        else if (this._canCardCompleteMeld(card, [...hand, card], player, false)) pickupScore += 10;
+
+        const sameRankCount = hand.filter(c => c.rank === card.rank && c.suit !== card.suit).length;
+        if (sameRankCount >= 2) pickupScore += 12;
+        else if (sameRankCount === 1) pickupScore += 5;
+
+        const suitedNeighbors = hand.filter(c => c.suit === card.suit && this._rankDistance(c.rank, card.rank) <= 2);
+        pickupScore += suitedNeighbors.length * 4;
+
+        if (card.getPoints() >= 10 && pickupScore < 8) pickupScore -= 3;
+        return pickupScore;
+    }
+
+    _scoreDiscardRisk(card, nextPlayerIndex) {
+        if (!card) return 0;
+        let risk = 0;
+        const nextLog = this.pickup_log[nextPlayerIndex] || [];
+        const lastPickup = nextLog[nextLog.length - 1];
+
+        if (lastPickup) {
+            if (card.rank === lastPickup.rank) risk += 18;
+            if (card.suit === lastPickup.suit && this._rankDistance(card.rank, lastPickup.rank) <= 1) risk += 16;
+            else if (card.suit === lastPickup.suit && this._rankDistance(card.rank, lastPickup.rank) === 2) risk += 8;
+        }
+
+        const nextPlayer = this.players[nextPlayerIndex];
+        if (nextPlayer && nextPlayer.isAi) {
+            const visibleHand = [...nextPlayer.hand, ...nextPlayer.melds.flat()];
+            if (visibleHand.some(c => c.rank === card.rank && c.suit !== card.suit)) risk += 5;
+            if (visibleHand.some(c => c.suit === card.suit && this._rankDistance(c.rank, card.rank) <= 1)) risk += 5;
+        }
+
+        if (this._countDiscardedRank(card.rank) >= 2) risk -= 5;
+        if (card.getPoints() >= 10) risk -= 2;
+        return risk;
+    }
+
+    _chooseAiDiscard(discardPool, player, drawnCard) {
+        if (discardPool.length === 0) return null;
+
+        const difficulty = this._aiDifficulty();
+        const nextIndex = (this.current_player_index + 1) % this.players.length;
+        let bestCard = null;
+        let bestScore = Infinity;
+
+        for (const potentialDiscard of discardPool) {
+            if (this.isJoker(potentialDiscard, player) && discardPool.length > 1) continue;
+
+            const tempHand = discardPool.filter(c => c !== potentialDiscard);
+            let score = this._evaluateHandPotential(tempHand, player);
+
+            if (difficulty !== 'easy') {
+                score += this._scoreDiscardRisk(potentialDiscard, nextIndex);
+                if (potentialDiscard === drawnCard) score += 4;
+                if (potentialDiscard.getPoints() >= 10 && this._countDiscardedRank(potentialDiscard.rank) > 0) score -= 6;
+            }
+
+            if (difficulty === 'hard') {
+                const keptNearMeldBonus = this._scoreNearMeldCards([potentialDiscard], discardPool, player);
+                score += Math.max(0, keptNearMeldBonus);
+            }
+
+            if (score < bestScore || (score === bestScore && potentialDiscard.getPoints() > (bestCard?.getPoints() || -1))) {
+                bestScore = score;
+                bestCard = potentialDiscard;
+            }
+        }
+
+        return bestCard || discardPool.sort((a,b) => b.getPoints() - a.getPoints())[0];
+    }
+
     executeAiTurn() {
         const player = this.players[this.current_player_index];
 
@@ -339,9 +517,9 @@ export class RummyGameLogic {
             if (this.isJoker(discardTop, player)) {
                 pickFromDiscard = true;
             } else {
-                const currentScore = this._evaluateHandPotential([...player.hand, ...player.melds.flat()], player);
-                const scoreWithCard = this._evaluateHandPotential([...player.hand, ...player.melds.flat(), discardTop], player);
-                if (scoreWithCard < currentScore) {
+                const pickupScore = this._scoreDiscardPickup(discardTop, player);
+                const threshold = this._aiDifficulty() === 'easy' ? 1 : this._aiDifficulty() === 'medium' ? 4 : 7;
+                if (pickupScore >= threshold) {
                     pickFromDiscard = true;
                 }
             }
@@ -392,50 +570,9 @@ export class RummyGameLogic {
                 return { drawn: drawnCard, discarded: drawnCard, declared: false };
             }
         }
-        
-        let lowestFutureScore = Infinity;
-        let candidateDiscards = [];
-        for (const potentialDiscard of discardPool) {
-            if (this.isJoker(potentialDiscard, player) && discardPool.length > 1) continue;
-            const tempHand = discardPool.filter(c => c !== potentialDiscard);
-            let futureEval = this._evaluateHandPotential(tempHand, player);
-            if (potentialDiscard.getPoints() >= 10 && this.discard_history.some(d => d.rank === potentialDiscard.rank)) {
-                futureEval -= 5; // prefer discarding high value cards already seen discarded
-            }
-            if (futureEval < lowestFutureScore) {
-                lowestFutureScore = futureEval;
-                candidateDiscards = [potentialDiscard];
-            } else if (futureEval === lowestFutureScore) {
-                candidateDiscards.push(potentialDiscard);
-            }
-        }
 
-        if (candidateDiscards.length > 1) {
-            const prevDiscarded = candidateDiscards.filter(c => this.discard_history.some(d => d.rank === c.rank));
-            if (prevDiscarded.length > 0) candidateDiscards = prevDiscarded;
-        }
+        bestCardToDiscard = this._chooseAiDiscard(discardPool, player, drawnCard);
 
-        const nextIndex = (this.current_player_index + 1) % this.players.length;
-        const nextLog = this.pickup_log[nextIndex] || [];
-        const lastPickup = nextLog[nextLog.length - 1];
-        if (candidateDiscards.length > 1 && lastPickup) {
-            const lastRank = this.rankMap.get(lastPickup.rank);
-            candidateDiscards = candidateDiscards.filter(c => {
-                const r = this.rankMap.get(c.rank);
-                if (c.rank === lastPickup.rank) return false;
-                if (c.suit === lastPickup.suit && Math.abs(r - lastRank) <= 1) return false;
-                return true;
-            });
-            if (candidateDiscards.length === 0) candidateDiscards = [prevDiscarded ? prevDiscarded[0] : discardPool[0]];
-        }
-
-        if (candidateDiscards.length === 0) {
-            candidateDiscards = discardPool;
-        }
-
-        candidateDiscards.sort((a,b)=>b.getPoints()-a.getPoints());
-        bestCardToDiscard = candidateDiscards[0];
-        
         if (!bestCardToDiscard) {
              bestCardToDiscard = discardPool.sort((a,b)=>b.getPoints()-a.getPoints())[0];
         }
@@ -650,4 +787,4 @@ export class RummyGameLogic {
         this.current_player_index = (this.current_player_index + 1) % this.players.length;
         this.turn_state = 'DRAW';
     }
-}    
+}

@@ -86,6 +86,7 @@ document.addEventListener('DOMContentLoaded', () => {
             return {
                 numPlayers: clampNumber(safe.numPlayers, 1, 1, 3),
                 numRounds: clampNumber(safe.numRounds, 3, 1),
+                aiDifficulty: ['easy', 'medium', 'hard'].includes(safe.aiDifficulty) ? safe.aiDifficulty : 'hard',
                 hiddenJoker: safe.hiddenJoker !== undefined ? !!safe.hiddenJoker : true,
                 debugMode: !!safe.debugMode,
                 fastMode: safe.fastMode !== undefined ? !!safe.fastMode : true
@@ -96,6 +97,7 @@ document.addEventListener('DOMContentLoaded', () => {
             return this.normalizeSettings({
                 numPlayers: document.getElementById('num-players').value,
                 numRounds: document.getElementById('num-rounds').value,
+                aiDifficulty: document.getElementById('ai-difficulty').value,
                 hiddenJoker: document.getElementById('hidden-joker').checked,
                 debugMode: document.getElementById('debug-mode').checked,
                 fastMode: document.getElementById('fast-mode').checked
@@ -107,8 +109,10 @@ document.addEventListener('DOMContentLoaded', () => {
             const normalized = this.normalizeSettings(settings);
             const numPlayersSelect = document.getElementById('num-players');
             const numRoundsSelect = document.getElementById('num-rounds');
+            const aiDifficultySelect = document.getElementById('ai-difficulty');
             if (numPlayersSelect) numPlayersSelect.value = String(normalized.numPlayers);
             if (numRoundsSelect) numRoundsSelect.value = String(normalized.numRounds);
+            if (aiDifficultySelect) aiDifficultySelect.value = normalized.aiDifficulty;
             const hiddenJokerCheckbox = document.getElementById('hidden-joker');
             const debugModeCheckbox = document.getElementById('debug-mode');
             const fastModeCheckbox = document.getElementById('fast-mode');
